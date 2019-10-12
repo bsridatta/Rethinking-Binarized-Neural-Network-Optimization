@@ -4,8 +4,9 @@
 # Rethinking Binarized Neural Network Optimization     
 
 
-[![Conference](http://img.shields.io/badge/AnyConference-year-4b44ce.svg)](https://papers.nips.cc/book/advances-in-neural-information-processing-systems-31-2018)  
-[![Paper](http://img.shields.io/badge/arxiv-math.co:1480.1111-B31B1B.svg)](https://www.nature.com/articles/nature14539)
+[![Conference](http://img.shields.io/badge/NeurIPS-2019-4b44ce.svg)](https://papers.nips.cc/book/advances-in-neural-information-processing-systems-31-2018)
+
+[![Paper](http://img.shields.io/badge/paper-arxiv.1906.02107-B31B1B.svg)](https://arxiv.org/pdf/1906.02107.pdf)
 
 </div>
  
