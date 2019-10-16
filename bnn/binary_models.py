@@ -10,12 +10,14 @@
 # Author(s): Nik Vaessen
 ################################################################################
 
+from torch import Tensor
+
 import torch.nn as nn
 import torch.nn.functional as f
 
-from torch import Tensor
+from torch.optim.optimizer import Optimizer, _params_t
 
-from typing import TypeVar, Union, Tuple
+from typing import TypeVar, Union, Tuple, Optional, Callable
 
 ################################################################################
 
@@ -31,6 +33,26 @@ _size_2_t = _scalar_or_tuple_2_t[int]
 
 def to_binary(inp: Tensor):
     return inp.sign()
+
+
+################################################################################
+# Optimizers for binary networks
+
+
+class MomentumWithThresholdBinaryOptimizer(Optimizer):
+    def __init__(self, params: _params_t):
+        super(MomentumWithThresholdBinaryOptimizer, self).__init__(params)
+
+    def step(self, closure: Optional[Callable[[], float]] = ...) -> None:
+        self.param_groups
+
+        print(self.param_groups)
+
+        pass
+
+
+class LatentWeightBinaryOptimizer:
+    pass
 
 
 ################################################################################
@@ -61,5 +83,6 @@ class BinaryConv2d(nn.Conv2d):
         return f.conv2d(
             inp, weight, bias, self.stride, self.padding, self.dilation, self.groups
         )
+
 
 ################################################################################

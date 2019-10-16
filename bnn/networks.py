@@ -3,7 +3,11 @@ import torch.nn as nn
 from torch.nn import Conv2d, MaxPool2d, Linear
 from torch.nn.functional import relu, hardtanh
 
-from binary_models import BinaryConv2d, BinaryLinear
+from binary_models import (
+    BinaryConv2d,
+    BinaryLinear,
+    MomentumWithThresholdBinaryOptimizer,
+)
 
 
 class Flatten(nn.Module):
@@ -67,6 +71,7 @@ class RealVggCloneNet(nn.Module):
 
 ################################################################################
 
+
 class ExampleBinaryNet(nn.Module):
     def __init__(self):
         super(ExampleBinaryNet, self).__init__()
@@ -112,3 +117,13 @@ class ExampleNet(nn.Module):
         x = self.fc3(x)
 
         return x
+
+
+class TrivialBinaryNetwork(nn.Module):
+    def __init__(self, in_features: int = 10):
+        super(TrivialBinaryNetwork, self).__init__()
+
+        self.layers = nn.Sequential(nn.Linear(in_features, out_features=2))
+
+    def forward(self, x):
+        self.layers.forward(x)

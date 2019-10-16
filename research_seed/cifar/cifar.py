@@ -5,7 +5,7 @@ import os
 import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-from torchvision.datasets import MNIST
+from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
 from argparse import ArgumentParser
 
@@ -48,7 +48,7 @@ class CoolSystem(pl.LightningModule):
     def train_dataloader(self):
         # REQUIRED
         return DataLoader(
-            MNIST(
+            CIFAR10(
                 os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
             ),
             batch_size=self.hparams.batch_size,
@@ -58,7 +58,7 @@ class CoolSystem(pl.LightningModule):
     def val_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            MNIST(
+            CIFAR10(
                 os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
             ),
             batch_size=self.hparams.batch_size,
@@ -68,7 +68,7 @@ class CoolSystem(pl.LightningModule):
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            MNIST(
+            CIFAR10(
                 os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
             ),
             batch_size=self.hparams.batch_size,
