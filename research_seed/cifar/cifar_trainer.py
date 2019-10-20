@@ -3,7 +3,7 @@ This file runs the main training/val loop, etc... using Lightning Trainer
 """
 from pytorch_lightning import Trainer
 from argparse import ArgumentParser
-from research_seed.mnist.mnist import CoolSystem
+from research_seed.cifar.mnist import CoolSystem
 
 
 def main(hparams):
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--nodes', type=int, default=1)
 
     # give the module a chance to add own params
-    # good practice to define LightningModule speficic params in the module
+    # good practice to define LightningModule specific params in the module
     parser = CoolSystem.add_model_specific_args(parser)
 
     # parse params
