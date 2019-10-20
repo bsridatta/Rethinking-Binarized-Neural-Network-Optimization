@@ -10,14 +10,13 @@
 # Author(s): Nik Vaessen
 ################################################################################
 
-from torch import Tensor
+from typing import TypeVar, Union, Tuple, Optional, Callable
 
+import torch
 import torch.nn as nn
 import torch.nn.functional as f
-
-from torch.optim.optimizer import Optimizer, _params_t
-
-from typing import TypeVar, Union, Tuple, Optional, Callable
+from torch import Tensor
+from torch.optim.optimizer import Optimizer
 
 ################################################################################
 
@@ -40,15 +39,45 @@ def to_binary(inp: Tensor):
 
 
 class MomentumWithThresholdBinaryOptimizer(Optimizer):
-    def __init__(self, params: _params_t):
-        super(MomentumWithThresholdBinaryOptimizer, self).__init__(params)
+    def __init__(self, params, ar: float = 0.999, threshold: float = 1):
+        if not 0 < ar < 1:
+            raise ValueError(
+                "given adaptivity rate {} is invalid; should be in (0, 1) (excluding endpoints)".format(
+                    ar
+                )
+            )
+
+        if threshold <= 0:
+            raise ValueError(
+                "given threshold {} is invalid; should be > 0".format(threshold)
+            )
+
+        defaults = dict(adaptivity_rate=ar, threshold=threshold)
+        super(MomentumWithThresholdBinaryOptimizer, self).__init__(params, defaults)
 
     def step(self, closure: Optional[Callable[[], float]] = ...) -> None:
-        self.param_groups
+        for group in self.param_groups:
+            params = group["params"]
 
-        print(self.param_groups)
+            y = group["adaptivity_rate"]
+            t = group["threshold"]
 
-        pass
+            for p in params:
+                grad = p.grad.data
+                state = self.state[p]
+
+                if "moving_average" not in state:
+                    m = state["moving_average"] = torch.clone(grad).detach()
+                else:
+                    m: Tensor = state["moving_average"]
+
+                    m.mul_(1 - y)
+                    m.add_(grad.mul(y))
+
+                mask = m.abs() >= t * (m.sign() == p.sign())
+                mask = mask.double() * -1
+
+                p.mul_(mask)
 
 
 class LatentWeightBinaryOptimizer:

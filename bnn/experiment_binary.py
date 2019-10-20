@@ -5,6 +5,8 @@ import torch.distributions as dist
 import torch.optim as opt
 import torch.utils.data as dutils
 
+from binary_models import MomentumWithThresholdBinaryOptimizer
+
 group_a_generator = dist.Normal(10, 4)
 group_b_generator = dist.Normal(-10, 4)
 group_c_generator = dist.Normal(0, 4)
@@ -35,9 +37,9 @@ def generate_data(n_samples=100, n_features=100):
     a, b, c = [], [], []
 
     for _ in range(0, n_samples):
-        a.append((group_a_generator.sample((1, n_features)), get_one_hot(0, 3)))
-        b.append((group_b_generator.sample((1, n_features)), get_one_hot(1, 3)))
-        c.append((group_c_generator.sample((1, n_features)), get_one_hot(2, 3)))
+        a.append((group_a_generator.sample((1, n_features)), 0))
+        b.append((group_b_generator.sample((1, n_features)), 1))
+        c.append((group_c_generator.sample((1, n_features)), 2))
 
     return ToyDataset([] + a + b + c)
 
@@ -53,7 +55,7 @@ class RealNet(nn.Module):
     def forward(self, x):
         x = f.relu(self.fc1(x))
         x = f.relu(self.fc2(x))
-        x = f.softmax(self.fc3(x), 2)
+        x = self.fc3(x)
 
         return x
 
@@ -64,20 +66,47 @@ def main():
     train = generate_data(n_samples=1000, n_features=100)
     test = generate_data(n_samples=100, n_features=100)
 
-    train_loaded = dutils.DataLoader(train, batch_size=4)
+    train_loaded = dutils.DataLoader(train, batch_size=16)
+    test_loaded = dutils.DataLoader(test, batch_size=16)
 
     network: nn.Module = RealNet(n_features, n_classes)
 
-    loss = f.cross_entropy
-    optimizer = opt.SGD
+    loss_fn = f.cross_entropy
+    optimizer = MomentumWithThresholdBinaryOptimizer(params=network.parameters())
 
-    for i, data in enumerate(train_loaded, 0):
-        batch, labels = data
+    for epoch in range(0, 2):
+        print("epoch", epoch)
 
-        out = network.forward(batch)
-        print(out)
+        for i, data in enumerate(train_loaded, 0):
+            batch, labels = data
 
-        break
+            optimizer.zero_grad()
+
+            out = network(batch).squeeze()
+            loss = loss_fn(out, labels)
+
+            loss.backward()
+
+            optimizer.step()
+
+            break
+
+
+    exit(0)
+
+    correct = 0
+    total = 0
+    with t.no_grad():
+        for data in test_loaded:
+            images, labels = data
+
+            outputs = network(images).squeeze()
+
+            _, predicted = t.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    print("Accuracy of the network on the test samples: %d %%" % (100 * correct / total))
 
 
 if __name__ == "__main__":
