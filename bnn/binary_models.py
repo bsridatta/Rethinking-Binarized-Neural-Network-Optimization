@@ -74,10 +74,11 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                     m.mul_(1 - y)
                     m.add_(grad.mul(y))
 
-                mask = m.abs() >= t * (m.sign() == p.sign())
+                mask = (m.abs() >= t) * (m.sign() == p.sign())
                 mask = mask.double() * -1
+                mask[mask == 0] = 1
 
-                p.mul_(mask)
+                p.data.mul_(mask)
 
 
 class LatentWeightBinaryOptimizer:
