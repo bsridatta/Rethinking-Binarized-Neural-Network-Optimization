@@ -39,7 +39,7 @@ def to_binary(inp: Tensor):
 
 
 class MomentumWithThresholdBinaryOptimizer(Optimizer):
-    def __init__(self, params, ar: float = 0.999, threshold: float = 1):
+    def __init__(self, params, ar: float = 0.0001, threshold: float = 0):
         if not 0 < ar < 1:
             raise ValueError(
                 "given adaptivity rate {} is invalid; should be in (0, 1) (excluding endpoints)".format(
@@ -47,7 +47,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 )
             )
 
-        if threshold <= 0:
+        if threshold < 0:
             raise ValueError(
                 "given threshold {} is invalid; should be > 0".format(threshold)
             )
@@ -61,7 +61,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
 
             y = group["adaptivity_rate"]
             t = group["threshold"]
-
+            flips = []
             for p in params:
                 grad = p.grad.data
                 state = self.state[p]
@@ -77,9 +77,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 mask = (m.abs() >= t) * (m.sign() == p.sign())
                 mask = mask.double() * -1
                 mask[mask == 0] = 1
-
+                flips.append((mask == -1).sum().item())
                 p.data.mul_(mask)
-
+        return flips
 
 class LatentWeightBinaryOptimizer:
     pass
@@ -106,7 +106,7 @@ class BinaryLinear(nn.Linear):
             weight = self.weight
 
         bias = self.bias if self.bias is None else to_binary(self.bias)
-        inp = to_binary(inp)
+        # inp = to_binary(inp)
 
         return f.linear(inp, weight, bias)
 

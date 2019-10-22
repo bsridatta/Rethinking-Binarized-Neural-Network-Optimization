@@ -7,8 +7,9 @@ import torch.utils.data as dutils
 
 from binary_models import MomentumWithThresholdBinaryOptimizer, BinaryLinear
 
-group_a_generator = dist.Normal(10, 4)
-group_b_generator = dist.Normal(-10, 4)
+t.manual_seed(666)
+group_a_generator = dist.Normal(100, 4)
+group_b_generator = dist.Normal(-100, 4)
 group_c_generator = dist.Normal(0, 4)
 
 
@@ -65,10 +66,19 @@ class BinaryNet(nn.Module):
         super(BinaryNet, self).__init__()
 
         self.fc1 = BinaryLinear(in_features, 100)
+        # self.bn1 = nn.BatchNorm1d(num_features=100)
+
         self.fc2 = BinaryLinear(100, 50)
+        # self.bn2 = nn.BatchNorm1d(num_features=50)
+
         self.fc3 = BinaryLinear(50, out_features)
+        # self.bn3 = nn.BatchNorm1d(num_features=out_features)
 
     def forward(self, x):
+        # x = f.hardtanh(self.bn1(self.fc1(x)))
+        # x = f.hardtanh(self.bn2(self.fc2(x)))
+        # x = self.bn3(self.fc3(x))
+
         x = f.hardtanh(self.fc1(x))
         x = f.hardtanh(self.fc2(x))
         x = self.fc3(x)
@@ -80,10 +90,10 @@ def main():
     use_gpu = False
     use_binary = True
 
-    n_features, n_classes = 100, 3
+    n_features, n_classes = 1000, 3
 
-    train = generate_data(n_samples=1000, n_features=100)
-    test = generate_data(n_samples=100, n_features=100)
+    train = generate_data(n_samples=10, n_features=n_features)
+    test = generate_data(n_samples=200, n_features=100)
 
     train_loaded = dutils.DataLoader(train, batch_size=16)
     test_loaded = dutils.DataLoader(test, batch_size=16)
@@ -96,15 +106,17 @@ def main():
     if use_binary:
         network: nn.Module = BinaryNet(n_features, n_classes)
         loss_fn = f.multi_margin_loss
-        optimizer = MomentumWithThresholdBinaryOptimizer(network.parameters(), threshold=0.00001)
+        optimizer = MomentumWithThresholdBinaryOptimizer(params=network.parameters(), ar=0.0001, threshold=0.0001)
     else:
         network: nn.Module = RealNet(n_features, n_classes)
         loss_fn = f.cross_entropy
         optimizer = opt.SGD(network.parameters(), 0.001)
 
     for epoch in range(0, 100):
-        print("epoch", epoch)
-
+        print("epoch", epoch, end = " ")
+        sum_loss = 0
+        total_losses = 0
+        total_flips = [0]*6
         for i, data in enumerate(train_loaded, 0):
             batch, labels = data
 
@@ -117,14 +129,20 @@ def main():
             out = network(batch).squeeze()
 
             loss = loss_fn(out, labels)
+            sum_loss += loss.item()
+            total_losses += 1
             loss.backward()
+            flips = optimizer.step()
+            # print(flips)
+            total_flips = [a + b for a, b in zip(flips, total_flips)]
 
-            optimizer.step()
+        print(sum_loss/total_losses, end =" ")
+        print(total_flips)
 
     correct = 0
     total = 0
     with t.no_grad():
-        for data in test_loaded:
+        for data in train_loaded:
             images, labels = data
 
             outputs = network(images).squeeze()
