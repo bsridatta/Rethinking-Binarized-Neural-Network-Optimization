@@ -90,11 +90,21 @@ class LatentWeightBinaryOptimizer:
 
 
 class BinaryLinear(nn.Linear):
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(self, in_features: int, out_features: int, latent_weight=False):
         super().__init__(in_features, out_features)
 
+        self.latent_weight = latent_weight
+
+        if not self.latent_weight:
+            self.weight.data.sign_()
+            self.bias.data.sign_() if self.bias is not None else None
+
     def forward(self, inp: Tensor) -> Tensor:
-        weight = to_binary(self.weight)
+        if self.latent_weight:
+            weight = to_binary(self.weight)
+        else:
+            weight = self.weight
+
         bias = self.bias if self.bias is None else to_binary(self.bias)
         inp = to_binary(inp)
 
