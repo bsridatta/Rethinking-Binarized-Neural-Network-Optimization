@@ -78,6 +78,8 @@ class BinaryNet(nn.Module):
 
 def main():
     use_gpu = False
+    use_binary = True
+
     n_features, n_classes = 100, 3
 
     train = generate_data(n_samples=1000, n_features=100)
@@ -91,10 +93,16 @@ def main():
     if use_gpu:
         network = network.to("cuda")
 
-    loss_fn = f.cross_entropy
-    optimizer = MomentumWithThresholdBinaryOptimizer(params=network.parameters())
+    if use_binary:
+        network: nn.Module = BinaryNet(n_features, n_classes)
+        loss_fn = f.multi_margin_loss
+        optimizer = MomentumWithThresholdBinaryOptimizer(network.parameters(), threshold=0.00001)
+    else:
+        network: nn.Module = RealNet(n_features, n_classes)
+        loss_fn = f.cross_entropy
+        optimizer = opt.SGD(network.parameters(), 0.001)
 
-    for epoch in range(0, 50):
+    for epoch in range(0, 100):
         print("epoch", epoch)
 
         for i, data in enumerate(train_loaded, 0):
@@ -107,8 +115,8 @@ def main():
             optimizer.zero_grad()
 
             out = network(batch).squeeze()
-            loss = loss_fn(out, labels)
 
+            loss = loss_fn(out, labels)
             loss.backward()
 
             optimizer.step()
