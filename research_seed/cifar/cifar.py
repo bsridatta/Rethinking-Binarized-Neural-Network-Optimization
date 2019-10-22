@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, SubsetRandomSampler
 
 
 from torchvision.datasets import CIFAR10
@@ -26,12 +26,17 @@ train_val_transform = transforms.Compose(
         transforms.RandomCrop((32, 32)),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize(128, 256),
+        # values are between [0, 1], we want [-1, 1]
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ]
 )
 
 test_transform = transforms.Compose(
-    [transforms.ToTensor(), transforms.Normalize(128, 256)]
+    [
+        transforms.ToTensor(),
+        # values are between [0, 1], we want [-1, 1]
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ]
 )
 
 
@@ -102,6 +107,7 @@ class BnnOnCIFAR10(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         # REQUIRED
         x, y = batch
+
         y_hat = self.forward(x)
 
         return {"loss": F.cross_entropy(y_hat, y)}
@@ -133,6 +139,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                 os.getcwd(), train=True, download=True, transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
+            sampler=SubsetRandomSampler([0, 1000])
         )
 
     @pl.data_loader
@@ -143,6 +150,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                 os.getcwd(), train=True, download=True, transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
+            sampler=SubsetRandomSampler([0, 1000])
         )
 
     @pl.data_loader
