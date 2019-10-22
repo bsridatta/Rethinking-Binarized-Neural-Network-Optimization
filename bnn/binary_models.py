@@ -62,6 +62,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
             y = group["adaptivity_rate"]
             t = group["threshold"]
             flips = []
+
             for p in params:
                 grad = p.grad.data
                 state = self.state[p]
@@ -79,7 +80,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 mask[mask == 0] = 1
                 flips.append((mask == -1).sum().item())
                 p.data.mul_(mask)
+
         return flips
+
 
 class LatentWeightBinaryOptimizer:
     pass
