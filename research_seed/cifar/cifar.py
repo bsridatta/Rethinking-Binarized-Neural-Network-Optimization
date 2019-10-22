@@ -2,30 +2,108 @@
 This file defines the core research contribution   
 """
 import os
+
 import torch
+import torch.nn as nn
+
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
+
+
 from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
+
 from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 
+from bnn import MomentumWithThresholdBinaryOptimizer
+from bnn import BinaryLinear, BinaryConv2d
 
-class CoolSystem(pl.LightningModule):
+train_val_transform = transforms.Compose(
+    [
+        transforms.Pad((4, 4, 4, 4)),
+        transforms.RandomCrop((32, 32)),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize(128, 256),
+    ]
+)
+
+test_transform = transforms.Compose(
+    [transforms.ToTensor(), transforms.Normalize(128, 256)]
+)
+
+
+num_classes = 10
+
+
+class BnnOnCIFAR10(pl.LightningModule):
     def __init__(self, hparams):
-        super(CoolSystem, self).__init__()
-        # not the best model...
+        super(BnnOnCIFAR10, self).__init__()
+
         self.hparams = hparams
-        self.l1 = torch.nn.Linear(28 * 28, 10)
+
+        self.ar = hparams.adaptivity_rate
+        self.t = hparams.threshold
+        self.bs = hparams.batch_size
+
+        self.features = nn.Sequential(
+            # layer 1
+            BinaryConv2d(3, 128, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(128),
+            nn.Hardtanh(inplace=True),
+            # layer 2
+            BinaryConv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(128),
+            nn.Hardtanh(inplace=True),
+            # layer 3
+            BinaryConv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(256),
+            nn.Hardtanh(inplace=True),
+            # layer 4
+            BinaryConv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(256),
+            nn.Hardtanh(inplace=True),
+            # layer 5
+            BinaryConv2d(256, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm2d(512),
+            nn.Hardtanh(inplace=True),
+            # layer 6
+            BinaryConv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.BatchNorm2d(512),
+            nn.Hardtanh(inplace=True),
+        )
+
+        self.classifier = nn.Sequential(
+            # layer 1
+            BinaryLinear(512 * 4 * 4, 1024, bias=True),
+            nn.BatchNorm1d(1024),
+            nn.Hardtanh(inplace=True),
+            # layer 2
+            BinaryLinear(1024, 1024, bias=True),
+            nn.BatchNorm1d(1024),
+            nn.Hardtanh(inplace=True),
+            # layer 3
+            BinaryLinear(1024, num_classes, bias=True),
+            nn.BatchNorm1d(num_classes, affine=False),
+        )
 
     def forward(self, x):
-        return torch.relu(self.l1(x.view(x.size(0), -1)))
+        x = self.features(x)
+        x = x.view(-1, 512 * 4 * 4)
+        x = self.classifier(x)
+
+        return x
 
     def training_step(self, batch, batch_idx):
         # REQUIRED
         x, y = batch
         y_hat = self.forward(x)
+
         return {"loss": F.cross_entropy(y_hat, y)}
 
     def validation_step(self, batch, batch_idx):
@@ -42,14 +120,17 @@ class CoolSystem(pl.LightningModule):
     def configure_optimizers(self):
         # REQUIRED
         # can return multiple optimizers and learning_rate schedulers
-        return torch.optim.Adam(self.parameters(), lr=self.hparams.learning_rate)
+        return MomentumWithThresholdBinaryOptimizer(
+            self.parameters(), ar=self.ar, threshold=self.t
+        )
 
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
+
         return DataLoader(
             CIFAR10(
-                os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
+                os.getcwd(), train=True, download=True, transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
         )
@@ -59,7 +140,7 @@ class CoolSystem(pl.LightningModule):
         # OPTIONAL
         return DataLoader(
             CIFAR10(
-                os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
+                os.getcwd(), train=True, download=True, transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
         )
@@ -68,9 +149,7 @@ class CoolSystem(pl.LightningModule):
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            CIFAR10(
-                os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
-            ),
+            CIFAR10(os.getcwd(), train=True, download=True, transform=test_transform),
             batch_size=self.hparams.batch_size,
         )
 
@@ -81,10 +160,8 @@ class CoolSystem(pl.LightningModule):
         """
         # MODEL specific
         parser = ArgumentParser(parents=[parent_parser])
-        parser.add_argument("--learning_rate", default=0.02, type=float)
+        parser.add_argument("--adaptivity-rate", default=0.01, type=float)
+        parser.add_argument("--threshold", default=0.01, type=float)
         parser.add_argument("--batch_size", default=32, type=int)
-
-        # training specific (for this model)
-        parser.add_argument("--max_nb_epochs", default=2, type=int)
 
         return parser

@@ -1,1 +1,1 @@
-import networks
+from binary_models import *

@@ -62,6 +62,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
             y = group["adaptivity_rate"]
             t = group["threshold"]
             flips = []
+
             for p in params:
                 grad = p.grad.data
                 state = self.state[p]
@@ -79,7 +80,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 mask[mask == 0] = 1
                 flips.append((mask == -1).sum().item())
                 p.data.mul_(mask)
+
         return flips
+
 
 class LatentWeightBinaryOptimizer:
     pass
@@ -90,8 +93,10 @@ class LatentWeightBinaryOptimizer:
 
 
 class BinaryLinear(nn.Linear):
-    def __init__(self, in_features: int, out_features: int, latent_weight=False):
-        super().__init__(in_features, out_features)
+    def __init__(
+        self, in_features: int, out_features: int, bias=False, latent_weight=False
+    ):
+        super().__init__(in_features, out_features, bias=bias)
 
         self.latent_weight = latent_weight
 
@@ -112,8 +117,18 @@ class BinaryLinear(nn.Linear):
 
 
 class BinaryConv2d(nn.Conv2d):
-    def __init__(self, in_channels: int, out_channels: int, kernel_size: _size_2_t):
-        super().__init__(in_channels, out_channels, kernel_size)
+    def __init__(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: _size_2_t,
+        stride=1,
+        padding=1,
+        bias=False,
+    ):
+        super().__init__(
+            in_channels, out_channels, kernel_size, stride, padding, bias=bias
+        )
 
     def forward(self, inp: Tensor) -> Tensor:
         weight = to_binary(self.weight)
