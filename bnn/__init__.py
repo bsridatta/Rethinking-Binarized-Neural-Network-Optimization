@@ -1,1 +1,1 @@
-from binary_models import *
+from bnn.binary_models import *

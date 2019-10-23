@@ -39,6 +39,9 @@ tests/save_dir
 tests/tests_tt_dir/
 processed/
 raw/
+lightning_logs/
+cifar-10-batches-py/
+cifar-10-python.tar.gz
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -120,3 +123,4 @@ venv.bak/
 
 # IDEs
 .idea
+.vscode

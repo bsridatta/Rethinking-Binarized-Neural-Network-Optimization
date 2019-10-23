@@ -168,8 +168,8 @@ class BnnOnCIFAR10(pl.LightningModule):
         """
         # MODEL specific
         parser = ArgumentParser(parents=[parent_parser])
-        parser.add_argument("--adaptivity-rate", default=0.01, type=float)
-        parser.add_argument("--threshold", default=0.01, type=float)
+        parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
+        parser.add_argument("--threshold", default=10**-8, type=float)
         parser.add_argument("--batch_size", default=32, type=int)
 
         return parser
