@@ -1,5 +1,5 @@
 """
-This file defines the core research contribution   
+This file defines the core research contribution
 """
 import os
 
@@ -8,7 +8,6 @@ import torch.nn as nn
 
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, SubsetRandomSampler
-
 
 from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
@@ -39,7 +38,6 @@ test_transform = transforms.Compose(
     ]
 )
 
-
 num_classes = 10
 
 
@@ -55,29 +53,35 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         self.features = nn.Sequential(
             # layer 1
-            BinaryConv2d(3, 128, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(3, 128, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.BatchNorm2d(128),
             nn.Hardtanh(inplace=True),
             # layer 2
-            BinaryConv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(128, 128, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(128),
             nn.Hardtanh(inplace=True),
             # layer 3
-            BinaryConv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(128, 256, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.BatchNorm2d(256),
             nn.Hardtanh(inplace=True),
             # layer 4
-            BinaryConv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(256, 256, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(256),
             nn.Hardtanh(inplace=True),
             # layer 5
-            BinaryConv2d(256, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(256, 512, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.BatchNorm2d(512),
             nn.Hardtanh(inplace=True),
             # layer 6
-            BinaryConv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(512, 512, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(512),
             nn.Hardtanh(inplace=True),
@@ -98,18 +102,16 @@ class BnnOnCIFAR10(pl.LightningModule):
         )
 
     def forward(self, x):
+        # REQUIRED
         x = self.features(x)
         x = x.view(-1, 512 * 4 * 4)
         x = self.classifier(x)
-
         return x
 
     def training_step(self, batch, batch_idx):
         # REQUIRED
         x, y = batch
-
         y_hat = self.forward(x)
-
         return {"loss": F.cross_entropy(y_hat, y)}
 
     def validation_step(self, batch, batch_idx):
@@ -124,11 +126,29 @@ class BnnOnCIFAR10(pl.LightningModule):
         return {"avg_val_loss": avg_loss}
 
     def configure_optimizers(self):
-        # REQUIRED
-        # can return multiple optimizers and learning_rate schedulers
-        return MomentumWithThresholdBinaryOptimizer(
+        optimizer = MomentumWithThresholdBinaryOptimizer(
             self.parameters(), ar=self.ar, threshold=self.t
         )
+
+        for param_idx, p in enumerate(self.parameters()):
+            optimizer.total_weights[param_idx] = len(p)
+
+        return optimizer
+
+    def optimizer_step(self, current_epoch, batch_nb, optimizer, optimizer_i, second_order_closure=None):
+        """
+        Adaptivity rate decay
+        """
+        # Decay every 100 epochs
+        if current_epoch % 100 == 0:
+            self.ar *= 0.1
+        # update params
+        flips_curr_step = optimizer.step()
+        pi = {}
+        for idx in flips_curr_step.keys() & optimizer.total_weights.keys():
+            pi[idx] = flips_curr_step[idx] / \
+                optimizer.total_weights[idx] + 10**9
+        optimizer.zero_grad()
 
     @pl.data_loader
     def train_dataloader(self):
@@ -136,10 +156,13 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         return DataLoader(
             CIFAR10(
-                os.getcwd(), train=True, download=True, transform=train_val_transform
+                os.getcwd(),
+                train=True,
+                download=True,
+                transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1000])
+            sampler=SubsetRandomSampler([0, 1])
         )
 
     @pl.data_loader
@@ -147,17 +170,21 @@ class BnnOnCIFAR10(pl.LightningModule):
         # OPTIONAL
         return DataLoader(
             CIFAR10(
-                os.getcwd(), train=True, download=True, transform=train_val_transform
+                os.getcwd(),
+                train=True,
+                download=True,
+                transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1000])
+            sampler=SubsetRandomSampler([0, 1])
         )
 
     @pl.data_loader
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            CIFAR10(os.getcwd(), train=True, download=True, transform=test_transform),
+            CIFAR10(os.getcwd(), train=True, download=True,
+                    transform=test_transform),
             batch_size=self.hparams.batch_size,
         )
 
@@ -170,6 +197,6 @@ class BnnOnCIFAR10(pl.LightningModule):
         parser = ArgumentParser(parents=[parent_parser])
         parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
         parser.add_argument("--threshold", default=10**-8, type=float)
-        parser.add_argument("--batch_size", default=32, type=int)
+        parser.add_argument("--batch_size", default=50, type=int)
 
         return parser
