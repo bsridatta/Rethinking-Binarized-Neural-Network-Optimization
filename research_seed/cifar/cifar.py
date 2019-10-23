@@ -2,6 +2,7 @@
 This file defines the core research contribution
 """
 import os
+from collections import OrderedDict
 
 import torch
 import torch.nn as nn
@@ -112,18 +113,59 @@ class BnnOnCIFAR10(pl.LightningModule):
         # REQUIRED
         x, y = batch
         y_hat = self.forward(x)
-        return {"loss": F.cross_entropy(y_hat, y)}
+
+        # Training metrics for monitoring
+        labels_hat = torch.argmax(y_hat, dim=1)
+        train_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
+        train_loss = F.cross_entropy(y_hat, y)
+        logger_logs = {'train_acc': train_acc,
+                       'train_loss': train_loss
+                       }
+
+        # loss is strictly required
+        output = OrderedDict({
+            "loss": train_loss,
+            "progress_bar": {"train_loss": train_loss},
+            "log": logger_logs
+        })
+
+        return output
 
     def validation_step(self, batch, batch_idx):
         # OPTIONAL
         x, y = batch
         y_hat = self.forward(x)
-        return {"val_loss": F.cross_entropy(y_hat, y)}
+
+        # validation metrics for monitoring
+        labels_hat = torch.argmax(y_hat, dim=1)
+        val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
+        val_loss = F.cross_entropy(y_hat, y)
+
+        output = OrderedDict({
+            "val_loss": val_loss,
+            "val_acc": val_acc
+        })
+
+        return output
 
     def validation_end(self, outputs):
-        # OPTIONAL
+        """
+        outputs -- list of outputs ftom each validation step
+        """
+        # The outputs here are strictly for progress bar
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
-        return {"avg_val_loss": avg_loss}
+        avg_acc = torch.stack([x['val_acc'] for x in outputs]).mean()
+
+        logger_logs = {'val_avg_acc': avg_acc,
+                       'val_avg_loss': avg_loss
+                       }
+
+        output = OrderedDict({
+            "progress_bar": {"val_avg_loss": avg_loss},
+            "log": logger_logs
+        })
+
+        return output
 
     def configure_optimizers(self):
         optimizer = MomentumWithThresholdBinaryOptimizer(
@@ -142,12 +184,15 @@ class BnnOnCIFAR10(pl.LightningModule):
         # Decay every 100 epochs
         if current_epoch % 100 == 0:
             self.ar *= 0.1
+
         # update params
         flips_curr_step = optimizer.step()
         pi = {}
+
         for idx in flips_curr_step.keys() & optimizer.total_weights.keys():
             pi[idx] = flips_curr_step[idx] / \
-                optimizer.total_weights[idx] + 10**9
+                optimizer.total_weights[idx] + 10**-9
+
         optimizer.zero_grad()
 
     @pl.data_loader
@@ -162,7 +207,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                 transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1])
+            sampler=SubsetRandomSampler([0, 100])
         )
 
     @pl.data_loader
@@ -176,7 +221,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                 transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1])
+            sampler=SubsetRandomSampler([0, 100])
         )
 
     @pl.data_loader
@@ -197,6 +242,6 @@ class BnnOnCIFAR10(pl.LightningModule):
         parser = ArgumentParser(parents=[parent_parser])
         parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
         parser.add_argument("--threshold", default=10**-8, type=float)
-        parser.add_argument("--batch_size", default=50, type=int)
+        parser.add_argument("--batch_size", default=3, type=int)
 
         return parser

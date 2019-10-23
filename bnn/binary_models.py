@@ -1,4 +1,4 @@
-################################################################################
+###############################################################################
 #
 # Provides Pytorch modules for a binary convolution network:
 # * BinaryLinear
@@ -8,7 +8,7 @@
 # https://github.com/itayhubara/BinaryNet.pytorch/blob/master/models/binarized_modules.py
 #
 # Author(s): Nik Vaessen
-################################################################################
+###############################################################################
 
 from typing import TypeVar, Union, Tuple, Optional, Callable
 
@@ -59,7 +59,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
     def step(self, closure: Optional[Callable[[], float]] = ...) -> None:
         for group in self.param_groups:
             params = group["params"]
-            
+
             y = group["adaptivity_rate"]
             t = group["threshold"]
             flips = {}
