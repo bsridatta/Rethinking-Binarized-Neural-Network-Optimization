@@ -3,6 +3,7 @@ This file defines the core research contribution
 """
 import os
 from collections import OrderedDict
+import math
 
 import torch
 import torch.nn as nn
@@ -51,6 +52,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         self.ar = hparams.adaptivity_rate
         self.t = hparams.threshold
         self.bs = hparams.batch_size
+        self.train_val_split = hparams.train_val_split
 
         self.features = nn.Sequential(
             # layer 1
@@ -143,7 +145,7 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         output = OrderedDict({
             "val_loss": val_loss,
-            "val_acc": val_acc
+            "val_acc":  torch.tensor(val_acc)  # must be a tensor
         })
 
         return output
@@ -198,37 +200,44 @@ class BnnOnCIFAR10(pl.LightningModule):
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
-
-        return DataLoader(
-            CIFAR10(
-                os.getcwd(),
-                train=True,
-                download=True,
-                transform=train_val_transform
-            ),
-            batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 100])
+        train_data = CIFAR10(
+            os.getcwd(),
+            train=True,
+            download=True,
+            transform=train_val_transform
         )
+        total_size = 100  # len(train_data)
+        return DataLoader(train_data,
+                          batch_size=self.hparams.batch_size,
+                          sampler=SubsetRandomSampler(
+                              [0, math.floor(total_size *
+                                             self.train_val_split-1)]
+                          )
+                          )
 
     @pl.data_loader
     def val_dataloader(self):
         # OPTIONAL
-        return DataLoader(
-            CIFAR10(
-                os.getcwd(),
-                train=True,
-                download=True,
-                transform=train_val_transform
-            ),
-            batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 100])
+        val_data = CIFAR10(
+            os.getcwd(),
+            train=True,
+            download=True,
+            transform=train_val_transform
         )
+        total_size = 100  # len(val_data)
+        return DataLoader(val_data,
+                          batch_size=self.hparams.batch_size,
+                          sampler=SubsetRandomSampler(
+                              [math.floor(len(val_data) *
+                                          self.train_val_split), total_size-1]
+                          )
+                          )
 
     @pl.data_loader
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            CIFAR10(os.getcwd(), train=True, download=True,
+            CIFAR10(os.getcwd(), train=False, download=True,
                     transform=test_transform),
             batch_size=self.hparams.batch_size,
         )
@@ -243,5 +252,6 @@ class BnnOnCIFAR10(pl.LightningModule):
         parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
         parser.add_argument("--threshold", default=10**-8, type=float)
         parser.add_argument("--batch_size", default=3, type=int)
+        parser.add_argument("--train_val_split", default=0.8, type=int)
 
         return parser
