@@ -29,19 +29,13 @@ def get_toy_data(normalize=False):
 
 
 def build_model():
-    kwargs = dict(
-        input_quantizer="ste_sign",
-        kernel_quantizer="ste_sign",
-        kernel_constraint="weight_clip",
-    )
-
     model = tf.keras.models.Sequential()
 
     model.add(
         lq.layers.QuantDense(
             50,
-            kernel_quantizer="ste_sign",
-            kernel_constraint="weight_clip",
+            # input_quantizer="ste_sign",
+            activation='hard_tanh',
             use_bias=False, input_shape=(100,)
         )
     )
@@ -49,9 +43,7 @@ def build_model():
     model.add(
         lq.layers.QuantDense(
             25,
-            input_quantizer="ste_sign",
-            kernel_quantizer="ste_sign",
-            kernel_constraint="weight_clip",
+            activation='hard_tanh',
             use_bias=False
         )
     )
@@ -59,9 +51,6 @@ def build_model():
     model.add(
         lq.layers.QuantDense(
             3,
-            input_quantizer="ste_sign",
-            kernel_quantizer="ste_sign",
-            kernel_constraint="weight_clip",
             use_bias=False
         )
     )
@@ -74,27 +63,23 @@ def build_model():
 def main():
     (train_images, train_labels), (test_images, test_labels) = get_toy_data()
 
-    model = build_model()
+    for _ in range(0, 10):
+        model = build_model()
 
-    print(type(train_images))
-    print(train_images.shape)
+        opt = lq.optimizers.Bop(tf.keras.optimizers.Adam(0.01), threshold=1e-3, gamma=1e-3)
 
-    print(type(train_labels))
-    print(train_labels.shape)
+        model.compile(
+            optimizer=opt, loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+        )
 
-    lq.models.summary(model)
+        model.fit(train_images, train_labels, batch_size=16, epochs=10, shuffle=True, verbose=False)
 
-    opt = lq.optimizers.Bop(tf.keras.optimizers.Adam(0.01), threshold=1e-3, gamma=1e-3)
+        train_loss, train_acc = model.evaluate(train_images, train_labels, verbose=False)
+        test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=False)
 
-    model.compile(
-        optimizer=opt, loss="sparse_categorical_crossentropy", metrics=["accuracy"]
-    )
-
-    model.fit(train_images, train_labels, batch_size=16, epochs=100, shuffle=True)
-
-    test_loss, test_acc = model.evaluate(test_images, test_labels)
-
-    print(f"Test accuracy {test_acc * 100:.2f} %")
+        print(
+            f"train accuracy: {train_acc: .3f} test accuracy: {test_acc: .3f}"
+        )
 
 
 if __name__ == "__main__":
