@@ -52,7 +52,6 @@ class BnnOnCIFAR10(pl.LightningModule):
         self.ar = hparams.adaptivity_rate
         self.t = hparams.threshold
         self.bs = hparams.batch_size
-        self.train_val_split = hparams.train_val_split
 
         self.features = nn.Sequential(
             # layer 1
@@ -206,14 +205,19 @@ class BnnOnCIFAR10(pl.LightningModule):
             download=True,
             transform=train_val_transform
         )
-        total_size = 100  # len(train_data)
-        return DataLoader(train_data,
-                          batch_size=self.hparams.batch_size,
-                          sampler=SubsetRandomSampler(
-                              [0, math.floor(total_size *
-                                             self.train_val_split-1)]
-                          )
-                          )
+
+        start = 0
+        end = 40000
+
+        data_loader = DataLoader(train_data,
+                                 batch_size=self.hparams.batch_size,
+                                 sampler=SubsetRandomSampler(
+                                     range(start, end)
+                                 )
+                                 )
+
+        print("train len ", len(data_loader))
+        return data_loader
 
     @pl.data_loader
     def val_dataloader(self):
@@ -224,14 +228,19 @@ class BnnOnCIFAR10(pl.LightningModule):
             download=True,
             transform=train_val_transform
         )
-        total_size = 100  # len(val_data)
-        return DataLoader(val_data,
-                          batch_size=self.hparams.batch_size,
-                          sampler=SubsetRandomSampler(
-                              [math.floor(len(val_data) *
-                                          self.train_val_split), total_size-1]
-                          )
-                          )
+
+        start = 40000
+        end = 50000  # len(val_data)
+
+        data_loader = DataLoader(val_data,
+                                 batch_size=self.hparams.batch_size,
+                                 sampler=SubsetRandomSampler(
+                                     range(start, end)
+                                 )
+                                 )
+
+        print("val len ", len(data_loader))
+        return data_loader
 
     @pl.data_loader
     def test_dataloader(self):
@@ -251,7 +260,6 @@ class BnnOnCIFAR10(pl.LightningModule):
         parser = ArgumentParser(parents=[parent_parser])
         parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
         parser.add_argument("--threshold", default=10**-8, type=float)
-        parser.add_argument("--batch_size", default=3, type=int)
-        parser.add_argument("--train_val_split", default=0.8, type=int)
+        parser.add_argument("--batch_size", default=50, type=int)
 
         return parser
