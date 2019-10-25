@@ -3,7 +3,8 @@ This file defines the core research contribution
 """
 import os
 from collections import OrderedDict
-import math
+import numpy as np
+# import math
 
 import torch
 import torch.nn as nn
@@ -188,14 +189,24 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         # update params - optimizer step
         flips_curr_step = optimizer.step()
-        pi = {}
+        pi = np.asarray([0]*len(optimizer.total_weights.keys()))
 
         for idx in flips_curr_step.keys() & optimizer.total_weights.keys():
             pi[idx] = flips_curr_step[idx] / \
                 optimizer.total_weights[idx] + 10**-9
 
+        ''' log pi from layer 0 to 33 '''
+        # self.logger.experiment.add_histogram(
+        #     tag="b"+str(batch_nb), values=pi, global_step=self.trainer.global_step)
+
         optimizer.zero_grad()
 
+    def on_after_backward(self):
+        # logging updated weights
+        if self.trainer.global_step % 1000 == 0:
+            for id, p in enumerate(self.parameters()):
+                self.logger.experiment.add_histogram(
+                    tag="l"+str(id), values=p, global_step=self.trainer.global_step)
 
     @pl.data_loader
     def train_dataloader(self):
