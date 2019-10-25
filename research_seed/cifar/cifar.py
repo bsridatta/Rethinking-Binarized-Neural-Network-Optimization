@@ -1,14 +1,15 @@
 """
-This file defines the core research contribution   
+This file defines the core research contribution
 """
 import os
+from collections import OrderedDict
+import math
 
 import torch
 import torch.nn as nn
 
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, SubsetRandomSampler
-
 
 from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
@@ -27,7 +28,7 @@ train_val_transform = transforms.Compose(
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         # values are between [0, 1], we want [-1, 1]
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ]
 )
 
@@ -35,10 +36,9 @@ test_transform = transforms.Compose(
     [
         transforms.ToTensor(),
         # values are between [0, 1], we want [-1, 1]
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ]
 )
-
 
 num_classes = 10
 
@@ -55,29 +55,35 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         self.features = nn.Sequential(
             # layer 1
-            BinaryConv2d(3, 128, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(3, 128, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.BatchNorm2d(128),
             nn.Hardtanh(inplace=True),
             # layer 2
-            BinaryConv2d(128, 128, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(128, 128, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(128),
             nn.Hardtanh(inplace=True),
             # layer 3
-            BinaryConv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(128, 256, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.BatchNorm2d(256),
             nn.Hardtanh(inplace=True),
             # layer 4
-            BinaryConv2d(256, 256, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(256, 256, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(256),
             nn.Hardtanh(inplace=True),
             # layer 5
-            BinaryConv2d(256, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(256, 512, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.BatchNorm2d(512),
             nn.Hardtanh(inplace=True),
             # layer 6
-            BinaryConv2d(512, 512, kernel_size=3, stride=1, padding=1, bias=True),
+            BinaryConv2d(512, 512, kernel_size=3,
+                         stride=1, padding=1, bias=True),
             nn.MaxPool2d(kernel_size=2, stride=2),
             nn.BatchNorm2d(512),
             nn.Hardtanh(inplace=True),
@@ -98,74 +104,150 @@ class BnnOnCIFAR10(pl.LightningModule):
         )
 
     def forward(self, x):
+        # REQUIRED
         x = self.features(x)
         x = x.view(-1, 512 * 4 * 4)
         x = self.classifier(x)
-
         return x
 
     def training_step(self, batch, batch_idx):
         # REQUIRED
         x, y = batch
-
         y_hat = self.forward(x)
 
-        return {"loss": F.cross_entropy(y_hat, y)}
+        # Training metrics for monitoring
+        labels_hat = torch.argmax(y_hat, dim=1)
+        train_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
+        train_loss = F.cross_entropy(y_hat, y)
+        logger_logs = {'train_acc': train_acc,
+                       'train_loss': train_loss
+                       }
+
+        # loss is strictly required
+        output = OrderedDict({
+            "loss": train_loss,
+            "progress_bar": {"train_loss": train_loss},
+            "log": logger_logs
+        })
+
+        return output
 
     def validation_step(self, batch, batch_idx):
         # OPTIONAL
         x, y = batch
         y_hat = self.forward(x)
-        return {"val_loss": F.cross_entropy(y_hat, y)}
+
+        # validation metrics for monitoring
+        labels_hat = torch.argmax(y_hat, dim=1)
+        val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
+        val_loss = F.cross_entropy(y_hat, y)
+
+        output = OrderedDict({
+            "val_loss": val_loss,
+            "val_acc":  torch.tensor(val_acc)  # must be a tensor
+        })
+
+        return output
 
     def validation_end(self, outputs):
-        # OPTIONAL
+        """
+        outputs -- list of outputs ftom each validation step
+        """
+        # The outputs here are strictly for progress bar
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+        avg_acc = torch.stack([x['val_acc'] for x in outputs]).mean()
 
-        return {"avg_val_loss": avg_loss}
+        logger_logs = {'val_avg_acc': avg_acc,
+                       'val_avg_loss': avg_loss
+                       }
 
-    def test_step(self, batch, batch_idx):
-        x, y = batch
+        output = OrderedDict({
+            "progress_bar": {"val_avg_loss": avg_loss},
+            "log": logger_logs
+        })
 
-        return self.forward(x)
-
-    def test_end(self, outputs):
-        return outputs
+        return output
 
     def configure_optimizers(self):
-        # REQUIRED
-        # can return multiple optimizers and learning_rate schedulers
-        return MomentumWithThresholdBinaryOptimizer(
+        optimizer = MomentumWithThresholdBinaryOptimizer(
             self.parameters(), ar=self.ar, threshold=self.t
         )
+
+        for param_idx, p in enumerate(self.parameters()):
+            optimizer.total_weights[param_idx] = len(p)
+
+        return optimizer
+
+    def optimizer_step(self, current_epoch, batch_nb, optimizer, optimizer_i, second_order_closure=None):
+        """
+        Adaptivity rate decay
+        """
+        # Decay every 100 epochs
+        if current_epoch % 100 == 0:
+            self.ar *= 0.1
+
+        # update params
+        flips_curr_step = optimizer.step()
+        pi = {}
+
+        for idx in flips_curr_step.keys() & optimizer.total_weights.keys():
+            pi[idx] = flips_curr_step[idx] / \
+                optimizer.total_weights[idx] + 10**-9
+
+        optimizer.zero_grad()
 
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
-
-        return DataLoader(
-            CIFAR10(
-                os.getcwd(), train=True, download=True, transform=train_val_transform
-            ),
-            batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1000]),
+        train_data = CIFAR10(
+            os.getcwd(),
+            train=True,
+            download=True,
+            transform=train_val_transform
         )
+
+        start = 0
+        end = 40000
+
+        data_loader = DataLoader(train_data,
+                                 batch_size=self.hparams.batch_size,
+                                 sampler=SubsetRandomSampler(
+                                     range(start, end)
+                                 )
+                                 )
+
+        print("train len ", len(data_loader))
+        return data_loader
 
     @pl.data_loader
     def val_dataloader(self):
         # OPTIONAL
-        return DataLoader(
-            CIFAR10(
-                os.getcwd(), train=True, download=True, transform=train_val_transform
-            ),
-            batch_size=self.hparams.batch_size,
+        val_data = CIFAR10(
+            os.getcwd(),
+            train=True,
+            download=True,
+            transform=train_val_transform
         )
+
+        start = 40000
+        end = 50000  # len(val_data)
+
+        data_loader = DataLoader(val_data,
+                                 batch_size=self.hparams.batch_size,
+                                 sampler=SubsetRandomSampler(
+                                     range(start, end)
+                                 )
+                                 )
+
+        print("val len ", len(data_loader))
+        return data_loader
 
     @pl.data_loader
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            CIFAR10(os.getcwd(), train=True, download=True, transform=test_transform),
+            CIFAR10(os.getcwd(), train=False, download=True,
+                    transform=test_transform),
             batch_size=self.hparams.batch_size,
         )
 
@@ -176,8 +258,8 @@ class BnnOnCIFAR10(pl.LightningModule):
         """
         # MODEL specific
         parser = ArgumentParser(parents=[parent_parser])
-        parser.add_argument("--adaptivity-rate", default=0.01, type=float)
-        parser.add_argument("--threshold", default=0.01, type=float)
-        parser.add_argument("--batch_size", default=32, type=int)
+        parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
+        parser.add_argument("--threshold", default=10**-8, type=float)
+        parser.add_argument("--batch_size", default=50, type=int)
 
         return parser

@@ -136,7 +136,7 @@ def main():
             # print(flips)
             total_flips = [a + b for a, b in zip(flips, total_flips)]
 
-        print(sum_loss/total_losses, end =" ")
+        print(sum_loss/total_losses, end=" ")
         print(total_flips)
 
     correct = 0
