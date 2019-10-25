@@ -2,3 +2,6 @@ torch
 torchvision
 torchsummary
 pytorch-lightning
+keras
+tensorflow-gpu
+larq

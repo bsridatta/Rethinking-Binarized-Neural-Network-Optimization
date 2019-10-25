@@ -7,10 +7,10 @@ import torch.utils.data as dutils
 
 from binary_models import MomentumWithThresholdBinaryOptimizer, BinaryLinear
 
-t.manual_seed(666)
-group_a_generator = dist.Normal(100, 4)
-group_b_generator = dist.Normal(-100, 4)
-group_c_generator = dist.Normal(0, 4)
+# t.manual_seed(424121)
+group_a_generator = dist.Normal(0.8, 0.001)
+group_b_generator = dist.Normal(0, 0.001)
+group_c_generator = dist.Normal(0.8, 0.001)
 
 
 class ToyDataset(dutils.Dataset):
@@ -34,7 +34,7 @@ def get_one_hot(hot_index, total_classes):
     raise ValueError("cannot go outside range of {}".format(total_classes))
 
 
-def generate_data(n_samples=100, n_features=100):
+def generate_data(n_samples=1024, n_features=100):
     a, b, c = [], [], []
 
     for _ in range(0, n_samples):
@@ -65,13 +65,13 @@ class BinaryNet(nn.Module):
     def __init__(self, in_features, out_features):
         super(BinaryNet, self).__init__()
 
-        self.fc1 = BinaryLinear(in_features, 100)
+        self.fc1 = BinaryLinear(in_features, 50)
         # self.bn1 = nn.BatchNorm1d(num_features=100)
 
-        self.fc2 = BinaryLinear(100, 50)
+        self.fc2 = BinaryLinear(50, 25)
         # self.bn2 = nn.BatchNorm1d(num_features=50)
 
-        self.fc3 = BinaryLinear(50, out_features)
+        self.fc3 = BinaryLinear(25, out_features)
         # self.bn3 = nn.BatchNorm1d(num_features=out_features)
 
     def forward(self, x):
@@ -90,10 +90,10 @@ def main():
     use_gpu = False
     use_binary = True
 
-    n_features, n_classes = 1000, 3
+    n_features, n_classes = 100, 3
 
-    train = generate_data(n_samples=10, n_features=n_features)
-    test = generate_data(n_samples=200, n_features=100)
+    train = generate_data(n_samples=1024, n_features=n_features)
+    test = generate_data(n_samples=100, n_features=n_features)
 
     train_loaded = dutils.DataLoader(train, batch_size=16)
     test_loaded = dutils.DataLoader(test, batch_size=16)
@@ -106,17 +106,19 @@ def main():
     if use_binary:
         network: nn.Module = BinaryNet(n_features, n_classes)
         loss_fn = f.multi_margin_loss
-        optimizer = MomentumWithThresholdBinaryOptimizer(params=network.parameters(), ar=0.0001, threshold=0.0001)
+        optimizer = MomentumWithThresholdBinaryOptimizer(
+            params=network.parameters(), ar=1e-3, threshold=1e-3
+        )
     else:
         network: nn.Module = RealNet(n_features, n_classes)
         loss_fn = f.cross_entropy
         optimizer = opt.SGD(network.parameters(), 0.001)
 
     for epoch in range(0, 100):
-        print("epoch", epoch, end = " ")
+        print("epoch", epoch, end=" ")
         sum_loss = 0
         total_losses = 0
-        total_flips = [0]*6
+        total_flips = [0] * 6
         for i, data in enumerate(train_loaded, 0):
             batch, labels = data
 
@@ -136,13 +138,13 @@ def main():
             # print(flips)
             total_flips = [a + b for a, b in zip(flips, total_flips)]
 
-        print(sum_loss/total_losses, end=" ")
+        print(sum_loss / total_losses, end=" ")
         print(total_flips)
 
     correct = 0
     total = 0
     with t.no_grad():
-        for data in train_loaded:
+        for data in test_loaded:
             images, labels = data
 
             outputs = network(images).squeeze()
