@@ -3,7 +3,7 @@ This file runs the main training/val loop, etc... using Lightning Trainer
 """
 from pytorch_lightning import Trainer
 from argparse import ArgumentParser
-from research_seed.cifar.mnist import CoolSystem
+from research_seed.baselines.mnist_baseline.mnist_baseline import CoolSystem
 
 
 def main(hparams):

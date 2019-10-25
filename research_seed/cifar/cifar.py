@@ -27,7 +27,7 @@ train_val_transform = transforms.Compose(
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         # values are between [0, 1], we want [-1, 1]
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ]
 )
 
@@ -35,7 +35,7 @@ test_transform = transforms.Compose(
     [
         transforms.ToTensor(),
         # values are between [0, 1], we want [-1, 1]
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ]
 )
 
@@ -121,7 +121,16 @@ class BnnOnCIFAR10(pl.LightningModule):
     def validation_end(self, outputs):
         # OPTIONAL
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
+
         return {"avg_val_loss": avg_loss}
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+
+        return self.forward(x)
+
+    def test_end(self, outputs):
+        return outputs
 
     def configure_optimizers(self):
         # REQUIRED
@@ -139,7 +148,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                 os.getcwd(), train=True, download=True, transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1000])
+            sampler=SubsetRandomSampler([0, 1000]),
         )
 
     @pl.data_loader
@@ -150,7 +159,6 @@ class BnnOnCIFAR10(pl.LightningModule):
                 os.getcwd(), train=True, download=True, transform=train_val_transform
             ),
             batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler([0, 1000])
         )
 
     @pl.data_loader
