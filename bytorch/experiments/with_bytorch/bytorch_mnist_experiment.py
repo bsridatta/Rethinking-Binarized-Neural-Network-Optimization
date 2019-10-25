@@ -32,14 +32,14 @@ def generate_data(test=False):
             MNIST(
                 os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
             ),
-            batch_size=16,
+            batch_size=64,
         )
     else:
         return DataLoader(
             MNIST(
                 os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
             ),
-            batch_size=16,
+            batch_size=64,
         )
 
 
@@ -52,19 +52,23 @@ class BinaryNet(nn.Module):
             BinaryConv2d(1, 32, (3, 3), bias=False),
             nn.MaxPool2d((2, 2)),
             nn.BatchNorm2d(32),
+            nn.Hardtanh(),
             # layer 2
             BinaryConv2d(32, 64, (3, 3), bias=False),
             nn.MaxPool2d((2, 2)),
             nn.BatchNorm2d(64),
+            nn.Hardtanh(),
             # layer 3
             BinaryConv2d(64, 64, (3, 3), bias=False),
             nn.BatchNorm2d(64),
+            nn.Hardtanh(),
         )
 
-        self.classfier = nn.Sequential(
+        self.classifier = nn.Sequential(
             # layer 4
             BinaryLinear(64*7*7, 64),
             nn.BatchNorm1d(64),
+            nn.Hardtanh(),
             # layer 5
             BinaryLinear(64, 10)
         )
@@ -77,12 +81,14 @@ class BinaryNet(nn.Module):
 
     def forward(self, x):
         x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
 
         return x
 
 
 def main():
-    use_gpu = True
+    use_gpu = False
     use_binary = True
 
     n_features, n_classes = 2, 3
@@ -90,13 +96,13 @@ def main():
     train_loaded = generate_data(test=False)
     test_loaded = generate_data(test=True)
 
-    for _ in range(0, 10):
+    for _ in range(0, 1):
 
         if use_binary:
             network: nn.Module = BinaryNet(n_features, n_classes)
             loss_fn = f.multi_margin_loss
             optimizer = MomentumWithThresholdBinaryOptimizer(
-                params=network.parameters(), ar=1e-3, threshold=1e-3
+                params=network.parameters(), ar=1e-5, threshold=1e-3
             )
         else:
             network: nn.Module = RealNet(n_features, n_classes)
@@ -106,11 +112,10 @@ def main():
         if use_gpu:
             network = network.to("cuda")
 
-        summary(network, (1, 28, 28))
-        exit()
+        summary(network, (1, 28, 28), device="cpu")
 
-        for epoch in range(0, 10):
-            # print("epoch", epoch, end=" ")
+        for epoch in range(0, 6):
+            print("epoch", epoch)
 
             sum_loss = 0
             total_losses = 0
@@ -144,7 +149,23 @@ def main():
                 if use_binary:
                     total_flips = [a + b for a, b in zip(flips, total_flips)]
 
-            # print(sum_loss / total_losses, end=" ")
+            print("average loss", sum_loss / total_losses)
+
+            correct = 0
+            total = 0
+            with t.no_grad():
+                for data in train_loaded:
+                    images, labels = data
+
+                    outputs = network(images).squeeze()
+
+                    _, predicted = t.max(outputs.data, 1)
+                    total += labels.size(0)
+                    correct += (predicted == labels).sum().item()
+
+            train_accuracy = 100 * (correct / total)
+            print("train accuracy:", train_accuracy)
+
             # print(total_flips)
 
         correct = 0

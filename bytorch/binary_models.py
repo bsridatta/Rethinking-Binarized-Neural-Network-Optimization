@@ -136,7 +136,7 @@ class BinaryConv2d(nn.Conv2d):
     def forward(self, inp: Tensor) -> Tensor:
         weight = to_binary(self.weight)
         bias = self.bias if self.bias is None else to_binary(self.bias)
-        inp = to_binary(inp)
+        # inp = to_binary(inp)
 
         return f.conv2d(
             inp, weight, bias, self.stride, self.padding, self.dilation, self.groups
