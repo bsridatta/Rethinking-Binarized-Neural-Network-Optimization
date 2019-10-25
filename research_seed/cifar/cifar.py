@@ -18,8 +18,8 @@ from argparse import ArgumentParser
 
 import pytorch_lightning as pl
 
-from bnn import MomentumWithThresholdBinaryOptimizer
-from bnn import BinaryLinear, BinaryConv2d
+from bytorch import MomentumWithThresholdBinaryOptimizer
+from bytorch import BinaryLinear, BinaryConv2d
 
 train_val_transform = transforms.Compose(
     [
@@ -126,7 +126,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         # loss is strictly required
         output = OrderedDict({
             "loss": train_loss,
-            "progress_bar": {"train_loss": train_loss},
+            "progress_bar": {"train_acc": train_acc},
             "log": logger_logs
         })
 
@@ -162,7 +162,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                        }
 
         output = OrderedDict({
-            "progress_bar": {"val_avg_loss": avg_loss},
+            "progress_bar": logger_logs,
             "log": logger_logs
         })
 
@@ -186,7 +186,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         if current_epoch % 100 == 0:
             self.ar *= 0.1
 
-        # update params
+        # update params - optimizer step
         flips_curr_step = optimizer.step()
         pi = {}
 
@@ -195,6 +195,7 @@ class BnnOnCIFAR10(pl.LightningModule):
                 optimizer.total_weights[idx] + 10**-9
 
         optimizer.zero_grad()
+
 
     @pl.data_loader
     def train_dataloader(self):
@@ -207,7 +208,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         )
 
         start = 0
-        end = 40000
+        end = 5  # 0000
 
         data_loader = DataLoader(train_data,
                                  batch_size=self.hparams.batch_size,
@@ -229,8 +230,8 @@ class BnnOnCIFAR10(pl.LightningModule):
             transform=train_val_transform
         )
 
-        start = 40000
-        end = 50000  # len(val_data)
+        start = 0  # 40000
+        end = 5  # 0000  # len(val_data)
 
         data_loader = DataLoader(val_data,
                                  batch_size=self.hparams.batch_size,

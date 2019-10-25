@@ -1,2 +1,2 @@
-from bnn.binary_models import *
-import bnn
+from bytorch.binary_models import *
+import bytorch
