@@ -1,11 +1,22 @@
+import os
+
 import torch as t
 import torch.distributions as dist
 import torch.nn as nn
 import torch.nn.functional as f
 import torch.optim as opt
 import torch.utils.data as dutils
+from torch.utils.data.dataloader import DataLoader
+from torchvision.datasets import MNIST
+from torchvision.transforms import transforms
 
-from binary_models import MomentumWithThresholdBinaryOptimizer, BinaryLinear
+from torchsummary import summary
+
+from binary_models import (
+    MomentumWithThresholdBinaryOptimizer,
+    BinaryLinear,
+    BinaryConv2d,
+)
 
 from matplotlib import pyplot as plt
 
@@ -15,111 +26,69 @@ group_b_generator = dist.Normal(0, 0.001)
 group_c_generator = dist.Normal(-0.8, 0.001)
 
 
-class ToyDataset(dutils.Dataset):
-    def __init__(self, samples):
-        self.samples = samples
-
-    def __getitem__(self, index):
-        return self.samples[index]
-
-    def __len__(self):
-        return len(self.samples)
-
-
-def get_one_hot(hot_index, total_classes):
-    if 0 <= hot_index < total_classes:
-        empty = t.zeros(total_classes)
-        empty[hot_index] = 1
-
-        return empty
-
-    raise ValueError("cannot go outside range of {}".format(total_classes))
-
-
-def generate_data(n_samples=1024, n_features=100):
-    a, b, c = [], [], []
-
-    for _ in range(0, n_samples):
-        a.append((group_a_generator.sample((1, n_features)), 0))
-        b.append((group_b_generator.sample((1, n_features)), 1))
-        c.append((group_c_generator.sample((1, n_features)), 2))
-
-    return ToyDataset([] + a + b + c)
-
-
-class RealNet(nn.Module):
-    def __init__(self, in_features, out_features):
-        super(RealNet, self).__init__()
-
-        self.fc1 = nn.Linear(in_features, 100)
-        self.fc2 = nn.Linear(100, 50)
-        self.fc3 = nn.Linear(50, out_features)
-
-    def forward(self, x):
-        x = f.relu(self.fc1(x))
-        x = f.relu(self.fc2(x))
-        x = self.fc3(x)
-
-        return x
+def generate_data(test=False):
+    if test:
+        return DataLoader(
+            MNIST(
+                os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
+            ),
+            batch_size=16,
+        )
+    else:
+        return DataLoader(
+            MNIST(
+                os.getcwd(), train=True, download=True, transform=transforms.ToTensor()
+            ),
+            batch_size=16,
+        )
 
 
 class BinaryNet(nn.Module):
     def __init__(self, in_features, out_features):
         super(BinaryNet, self).__init__()
 
-        self.fc1 = BinaryLinear(in_features, 50)
-        # self.bn1 = nn.BatchNorm1d(num_features=100)
+        self.features = nn.Sequential(
+            # layer 1
+            BinaryConv2d(1, 32, (3, 3), bias=False),
+            nn.MaxPool2d((2, 2)),
+            nn.BatchNorm2d(32),
+            # layer 2
+            BinaryConv2d(32, 64, (3, 3), bias=False),
+            nn.MaxPool2d((2, 2)),
+            nn.BatchNorm2d(64),
+            # layer 3
+            BinaryConv2d(64, 64, (3, 3), bias=False),
+            nn.BatchNorm2d(64),
+        )
 
-        self.fc2 = BinaryLinear(50, 25)
-        # self.bn2 = nn.BatchNorm1d(num_features=50)
-
-        self.fc3 = BinaryLinear(25, out_features)
-        # self.bn3 = nn.BatchNorm1d(num_features=out_features)
+        self.classfier = nn.Sequential(
+            # layer 4
+            BinaryLinear(64*7*7, 64),
+            nn.BatchNorm1d(64),
+            # layer 5
+            BinaryLinear(64, 10)
+        )
+        # self.fc1 = BinaryLinear(50, 25)
+        # self.fc2 = BinaryLinear()
+        # # self.bn2 = nn.BatchNorm1d(num_features=50)
+        #
+        # self.fc2 = BinaryLinear(25, out_features)
+        # # self.bn3 = nn.BatchNorm1d(num_features=out_features)
 
     def forward(self, x):
-        # x = f.hardtanh(self.bn1(self.fc1(x)))
-        # x = f.hardtanh(self.bn2(self.fc2(x)))
-        # x = self.bn3(self.fc3(x))
-
-        x = f.hardtanh(self.fc1(x))
-        x = f.hardtanh(self.fc2(x))
-        x = self.fc3(x)
+        x = self.features(x)
 
         return x
 
 
-def plot_data(dataset):
-    x = []
-    y = []
-
-    for data, label in dataset:
-        data = data.flatten()
-
-        x.append(data[0].item())
-        y.append(data[1].item())
-
-    print(x)
-    print(y)
-
-    plt.scatter(x, y)
-    plt.show()
-
-
 def main():
-    use_gpu = False
+    use_gpu = True
     use_binary = True
 
     n_features, n_classes = 2, 3
 
-    train = generate_data(n_samples=1024, n_features=n_features)
-    test = generate_data(n_samples=100, n_features=n_features)
-
-    # plot_data(train.samples)
-    #
-    # exit()
-
-    train_loaded = dutils.DataLoader(train, batch_size=16, shuffle=True)
-    test_loaded = dutils.DataLoader(test, batch_size=16, shuffle=True)
+    train_loaded = generate_data(test=False)
+    test_loaded = generate_data(test=True)
 
     for _ in range(0, 10):
 
@@ -136,6 +105,9 @@ def main():
 
         if use_gpu:
             network = network.to("cuda")
+
+        summary(network, (1, 28, 28))
+        exit()
 
         for epoch in range(0, 10):
             # print("epoch", epoch, end=" ")

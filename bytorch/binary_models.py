@@ -27,7 +27,7 @@ _scalar_or_tuple_2_t = Union[T, Tuple[T, T]]
 _size_2_t = _scalar_or_tuple_2_t[int]
 
 ################################################################################
-# Helper functions
+# Quantizers
 
 
 def to_binary(inp: Tensor):
@@ -56,7 +56,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
         defaults = dict(adaptivity_rate=ar, threshold=threshold)
         super(MomentumWithThresholdBinaryOptimizer, self).__init__(params, defaults)
 
-    def step(self, closure: Optional[Callable[[], float]] = ...) -> None:
+    def step(self, closure: Optional[Callable[[], float]] = ...):
+        flips = {None}
+
         for group in self.param_groups:
             params = group["params"]
 

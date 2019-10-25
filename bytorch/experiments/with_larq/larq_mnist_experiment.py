@@ -45,6 +45,7 @@ def build_model():
 
     model.add(lq.layers.QuantConv2D(64, (3, 3), use_bias=False, **kwargs))
     model.add(tf.keras.layers.BatchNormalization(scale=False))
+
     model.add(tf.keras.layers.Flatten())
 
     model.add(lq.layers.QuantDense(64, use_bias=False, **kwargs))
@@ -69,8 +70,10 @@ def main():
 
     lq.models.summary(model)
 
+    opt = lq.optimizers.Bop(tf.keras.optimizers.Adam(), threshold=1e-5, gamma=1e-3)
+
     model.compile(
-        optimizer="adam", loss="sparse_categorical_crossentropy", metrics=["accuracy"]
+        optimizer=opt, loss="sparse_categorical_crossentropy", metrics=["accuracy"]
     )
 
     model.fit(train_images, train_labels, batch_size=64, epochs=6)
