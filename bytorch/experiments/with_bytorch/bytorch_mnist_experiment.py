@@ -5,7 +5,7 @@ import torch.distributions as dist
 import torch.nn as nn
 import torch.nn.functional as f
 import torch.optim as opt
-import torch.utils.data as dutils
+
 from torch.utils.data.dataloader import DataLoader
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
@@ -20,7 +20,7 @@ from binary_models import (
 
 from matplotlib import pyplot as plt
 
-# t.manual_seed(424121)
+t.manual_seed(424121)
 group_a_generator = dist.Normal(0.8, 0.001)
 group_b_generator = dist.Normal(0, 0.001)
 group_c_generator = dist.Normal(-0.8, 0.001)
@@ -150,6 +150,7 @@ def main():
                     total_flips = [a + b for a, b in zip(flips, total_flips)]
 
             print("average loss", sum_loss / total_losses)
+            print(total_flips)
 
             correct = 0
             total = 0
