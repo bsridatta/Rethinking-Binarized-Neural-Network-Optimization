@@ -114,10 +114,6 @@ def main():
     train = generate_data(n_samples=1024, n_features=n_features)
     test = generate_data(n_samples=100, n_features=n_features)
 
-    # plot_data(train.samples)
-    #
-    # exit()
-
     train_loaded = dutils.DataLoader(train, batch_size=16, shuffle=True)
     test_loaded = dutils.DataLoader(test, batch_size=16, shuffle=True)
 
@@ -172,8 +168,8 @@ def main():
                 if use_binary:
                     total_flips = [a + b for a, b in zip(flips, total_flips)]
 
-            # print(sum_loss / total_losses, end=" ")
-            # print(total_flips)
+            print(sum_loss / total_losses, end=" ")
+            print(total_flips)
 
         correct = 0
         total = 0

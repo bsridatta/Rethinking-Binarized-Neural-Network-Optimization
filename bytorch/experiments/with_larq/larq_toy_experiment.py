@@ -66,7 +66,7 @@ def main():
     for _ in range(0, 10):
         model = build_model()
 
-        opt = lq.optimizers.Bop(tf.keras.optimizers.Adam(0.01), threshold=1e-3, gamma=1e-3)
+        opt = lq.optimizers.Bop(tf.keras.optimizers.Adam(0.01), threshold=1e-6, gamma=1e-5)
 
         model.compile(
             optimizer=opt, loss="sparse_categorical_crossentropy", metrics=["accuracy"]

@@ -15,7 +15,9 @@ from typing import TypeVar, Union, Tuple, Optional, Callable
 import torch
 import torch.nn as nn
 import torch.nn.functional as f
+
 from torch import Tensor
+from torch.autograd import Function
 from torch.optim.optimizer import Optimizer
 
 ################################################################################
@@ -30,9 +32,32 @@ _size_2_t = _scalar_or_tuple_2_t[int]
 # Quantizers
 
 
-def to_binary(inp: Tensor):
-    return inp.sign()
+class Binarize(Function):
+    clip_value = 1
 
+    @staticmethod
+    def forward(ctx, inp):
+        ctx.save_for_backward(inp)
+
+        output = inp.sign()
+
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        inp: Tensor = ctx.saved_tensors[0]
+
+        clipped = inp.abs() <= Binarize.clip_value
+
+        output = torch.zeros(inp.size())
+        output[clipped] = 1
+        output[~clipped] = 0
+
+        print(f"input={inp} grad_putput={grad_output}, output={output}")
+
+        return output
+
+binarize = Binarize.apply
 
 ################################################################################
 # Optimizers for binary networks
@@ -51,8 +76,8 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 "given threshold {} is invalid; should be > 0".format(threshold)
             )
 
-        self.total_weights = {} 
-        
+        self.total_weights = {}
+
         defaults = dict(adaptivity_rate=ar, threshold=threshold)
         super(MomentumWithThresholdBinaryOptimizer, self).__init__(params, defaults)
 
@@ -81,7 +106,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 mask = (m.abs() >= t) * (m.sign() == p.sign())
                 mask = mask.double() * -1
                 mask[mask == 0] = 1
-                flips[param_idx] = ((mask == -1).sum().item())
+
+                flips[param_idx] = (mask == -1).sum().item()
+
                 p.data.mul_(mask)
 
         return flips
@@ -97,24 +124,33 @@ class LatentWeightBinaryOptimizer:
 
 class BinaryLinear(nn.Linear):
     def __init__(
-        self, in_features: int, out_features: int, bias=False, latent_weight=False
+        self,
+        in_features: int,
+        out_features: int,
+        bias=False,
+        keep_latent_weight=False,
+        binarize_input=False,
     ):
         super().__init__(in_features, out_features, bias=bias)
 
-        self.latent_weight = latent_weight
+        self.keep_latent_weight = keep_latent_weight
+        self.binarize_input = binarize_input
 
-        if not self.latent_weight:
-            self.weight.data.sign_()
-            self.bias.data.sign_() if self.bias is not None else None
+        if not self.keep_latent_weight:
+            with torch.no_grad():
+                self.weight.data.sign_()
+                self.bias.data.sign_() if self.bias is not None else None
 
     def forward(self, inp: Tensor) -> Tensor:
-        if self.latent_weight:
-            weight = to_binary(self.weight)
+        if self.keep_latent_weight:
+            weight = binarize(self.weight)
         else:
             weight = self.weight
 
-        bias = self.bias if self.bias is None else to_binary(self.bias)
-        # inp = to_binary(inp)
+        bias = self.bias if self.bias is None else binarize(self.bias)
+
+        if self.binarize_input:
+            inp = binarize(inp)
 
         return f.linear(inp, weight, bias)
 
@@ -128,15 +164,26 @@ class BinaryConv2d(nn.Conv2d):
         stride=1,
         padding=1,
         bias=False,
+        keep_latent_weight=False,
+        binarize_input=False,
     ):
         super().__init__(
             in_channels, out_channels, kernel_size, stride, padding, bias=bias
         )
 
+        self.keep_latent_weight = keep_latent_weight
+        self.binarize_input = binarize_input
+
     def forward(self, inp: Tensor) -> Tensor:
-        weight = to_binary(self.weight)
-        bias = self.bias if self.bias is None else to_binary(self.bias)
-        # inp = to_binary(inp)
+        if self.keep_latent_weight:
+            weight = binarize(self.weight)
+        else:
+            weight = self.weight
+
+        bias = self.bias if self.bias is None else binarize(self.bias)
+
+        if self.binarize_input:
+            inp = binarize(inp)
 
         return f.conv2d(
             inp, weight, bias, self.stride, self.padding, self.dilation, self.groups
