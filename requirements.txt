@@ -1,8 +1,9 @@
+tensorflow==2.0.0rc2
+tensorflow-gpu==2.0.0rc2
 matplotlib
 torch
 torchvision
 torchsummary
 pytorch-lightning
 keras
-tensorflow-gpu
 larq
