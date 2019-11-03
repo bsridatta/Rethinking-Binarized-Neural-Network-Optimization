@@ -122,7 +122,7 @@ def main():
     train_loaded = generate_data(test=False)
     test_loaded = generate_data(test=True)
 
-    for trail_number in range(0, 100):
+    for trail_number in range(0, 1):
         print(f"starting trial {trail_number}")
         network: BinaryNet = BinaryNet(n_features, n_classes)
         # loss_fn = f.multi_margin_loss

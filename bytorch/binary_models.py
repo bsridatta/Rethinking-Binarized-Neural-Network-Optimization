@@ -4,6 +4,8 @@
 # * BinaryLinear
 # * BinaryConv2d
 #
+# Also includes Binary Optimizer
+#
 # Inspiration taken from:
 # https://github.com/itayhubara/BinaryNet.pytorch/blob/master/models/binarized_modules.py
 #
@@ -53,8 +55,6 @@ class Binarize(Function):
         output = torch.zeros(inp.size())
         output[clipped] = 1
         output[~clipped] = 0
-
-        # print(f"input={inp} grad_putput={grad_output}, output={output}")
 
         return output * grad_output
 
@@ -142,7 +142,7 @@ class LatentWeightBinaryOptimizer:
 
 
 ################################################################################
-# torch modules
+# binary torch layers
 
 
 class BinaryLinear(nn.Linear):
