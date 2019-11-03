@@ -1,24 +1,20 @@
 import os
+from collections import OrderedDict
 
 import torch as t
 import torch.distributions as dist
 import torch.nn as nn
 import torch.nn.functional as f
-import torch.optim as opt
-
 from torch.utils.data.dataloader import DataLoader
+from torchsummary import summary
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
-
-from torchsummary import summary
 
 from binary_models import (
     MomentumWithThresholdBinaryOptimizer,
     BinaryLinear,
     BinaryConv2d,
 )
-
-from matplotlib import pyplot as plt
 
 t.manual_seed(424121)
 group_a_generator = dist.Normal(0.8, 0.001)
@@ -48,36 +44,44 @@ class BinaryNet(nn.Module):
         super(BinaryNet, self).__init__()
 
         self.features = nn.Sequential(
-            # layer 1
-            BinaryConv2d(1, 32, (3, 3), bias=False),
-            nn.MaxPool2d((2, 2)),
-            nn.BatchNorm2d(32),
-            nn.Hardtanh(),
-            # layer 2
-            BinaryConv2d(32, 64, (3, 3), bias=False),
-            nn.MaxPool2d((2, 2)),
-            nn.BatchNorm2d(64),
-            nn.Hardtanh(),
-            # layer 3
-            BinaryConv2d(64, 64, (3, 3), bias=False),
-            nn.BatchNorm2d(64),
-            nn.Hardtanh(),
+            OrderedDict(
+                [
+                    # layer 1
+                    ("binary1", BinaryConv2d(1, 32, (3, 3), bias=False)),
+                    ("mp1", nn.MaxPool2d((2, 2))),
+                    ("bn1", nn.BatchNorm2d(32)),
+                    # ("activation1", nn.Hardtanh()),
+                    # layer 2
+                    (
+                        "binary2",
+                        BinaryConv2d(32, 64, (3, 3), bias=False, binarize_input=True),
+                    ),
+                    ("mp2", nn.MaxPool2d((2, 2))),
+                    ("bn2", nn.BatchNorm2d(64)),
+                    # ("activation2", nn.Hardtanh()),
+                    # layer 3
+                    (
+                        "binary3",
+                        BinaryConv2d(64, 64, (3, 3), bias=False, binarize_input=True),
+                    ),
+                    ("bn3", nn.BatchNorm2d(64)),
+                    # ("activation3", nn.Hardtanh()),
+                ]
+            )
         )
 
         self.classifier = nn.Sequential(
-            # layer 4
-            BinaryLinear(64*7*7, 64),
-            nn.BatchNorm1d(64),
-            nn.Hardtanh(),
-            # layer 5
-            BinaryLinear(64, 10)
+            OrderedDict(
+                [  # layer 4
+                    ("binary4", BinaryLinear(64 * 7 * 7, 64, binarize_input=True)),
+                    ("bn4", nn.BatchNorm1d(64)),
+                    # ("activation4", nn.Hardtanh()),
+                    # layer 5
+                    ("binary5", BinaryLinear(64, 10, binarize_input=True)),
+                    ("bn5", nn.BatchNorm1d(10)),
+                ]
+            )
         )
-        # self.fc1 = BinaryLinear(50, 25)
-        # self.fc2 = BinaryLinear()
-        # # self.bn2 = nn.BatchNorm1d(num_features=50)
-        #
-        # self.fc2 = BinaryLinear(25, out_features)
-        # # self.bn3 = nn.BatchNorm1d(num_features=out_features)
 
     def forward(self, x):
         x = self.features(x)
@@ -86,43 +90,78 @@ class BinaryNet(nn.Module):
 
         return x
 
+    def binary_parameters(self):
+        for name, layer in self.named_parameters():
+            if "binary" in name:
+                yield layer
+
+    def non_binary_parameters(self):
+        for name, layer in self.named_parameters():
+            if "bn" in name:
+                yield layer
+
+
+def print_params(network):
+    print("\nprinting parameters\n")
+
+    for name, p in network.named_parameters():
+        print(name)
+        print(p)
+        print("gradient")
+        print(p.grad)
+        print("\n")
+
+    print("################")
+
 
 def main():
     use_gpu = False
-    use_binary = True
 
     n_features, n_classes = 2, 3
 
     train_loaded = generate_data(test=False)
     test_loaded = generate_data(test=True)
 
-    for _ in range(0, 1):
+    for trail_number in range(0, 100):
+        print(f"starting trial {trail_number}")
+        network: BinaryNet = BinaryNet(n_features, n_classes)
+        # loss_fn = f.multi_margin_loss
+        loss_fn = f.cross_entropy
 
-        if use_binary:
-            network: nn.Module = BinaryNet(n_features, n_classes)
-            loss_fn = f.multi_margin_loss
-            optimizer = MomentumWithThresholdBinaryOptimizer(
-                params=network.parameters(), ar=1e-5, threshold=1e-3
-            )
-        else:
-            network: nn.Module = RealNet(n_features, n_classes)
-            loss_fn = f.cross_entropy
-            optimizer = opt.SGD(network.parameters(), 0.001)
+        ar = t.FloatTensor(1, 1).uniform_(1, 10).item()
+        tr = t.FloatTensor(1, 1).uniform_(1, 10).item()
+
+        ar = 1e-3
+        tr = 1e-5
+
+        print(f"ar={ar}, tr={tr}")
+
+        optimizer = MomentumWithThresholdBinaryOptimizer(
+            network.binary_parameters(),
+            network.non_binary_parameters(),
+            ar=ar,
+            threshold=tr,
+        )
 
         if use_gpu:
             network = network.to("cuda")
 
-        summary(network, (1, 28, 28), device="cpu")
+        # summary(network, (1, 28, 28), device="cpu")
+
+        # print_params(network)
 
         for epoch in range(0, 6):
             print("epoch", epoch)
 
             sum_loss = 0
             total_losses = 0
-            total_flips = [0] * 6
+            total_flips = [0 for _ in network.binary_parameters()]
+
+            prev_total_flips = sum(total_flips)
 
             for i, data in enumerate(train_loaded, 0):
                 batch, labels = data
+                print(f"\r{i}/{60000/64} - {total_flips}", end="")
 
                 if use_gpu:
                     batch = batch.to("cuda")
@@ -146,11 +185,22 @@ def main():
 
                 flips = optimizer.step()
 
-                if use_binary:
-                    total_flips = [a + b for a, b in zip(flips, total_flips)]
+                total_flips = [a + b for a, b in zip(flips.values(), total_flips)]
 
+                total_flips_current = sum(total_flips)
+                # if total_flips_current == prev_total_flips:
+                #     break
+                # else:
+                #     prev_total_flips = total_flips_current
+                # if i == 0:
+                #     print_params(network)
+                # print("step", i, "\n\n")
+
+            print()
             print("average loss", sum_loss / total_losses)
-            print(total_flips)
+
+            # print_params(network)
+
 
             correct = 0
             total = 0
@@ -166,8 +216,7 @@ def main():
 
             train_accuracy = 100 * (correct / total)
             print("train accuracy:", train_accuracy)
-
-            # print(total_flips)
+        # print(total_flips)
 
         correct = 0
         total = 0

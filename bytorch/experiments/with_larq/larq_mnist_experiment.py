@@ -21,7 +21,7 @@ def build_model():
     kwargs = dict(
         input_quantizer="ste_sign",
         kernel_quantizer="ste_sign",
-        kernel_constraint="weight_clip",
+        # kernel_constraint="weight_clip",
     )
 
     model = tf.keras.models.Sequential()
@@ -31,7 +31,7 @@ def build_model():
             32,
             (3, 3),
             kernel_quantizer="ste_sign",
-            kernel_constraint="weight_clip",
+            # kernel_constraint="weight_clip",
             use_bias=False,
             input_shape=(28, 28, 1),
         )

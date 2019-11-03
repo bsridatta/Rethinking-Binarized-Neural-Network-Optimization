@@ -19,6 +19,7 @@ import torch.nn.functional as f
 from torch import Tensor
 from torch.autograd import Function
 from torch.optim.optimizer import Optimizer
+from torch.optim import Adam
 
 ################################################################################
 
@@ -53,9 +54,9 @@ class Binarize(Function):
         output[clipped] = 1
         output[~clipped] = 0
 
-        print(f"input={inp} grad_putput={grad_output}, output={output}")
+        # print(f"input={inp} grad_putput={grad_output}, output={output}")
 
-        return output
+        return output * grad_output
 
 binarize = Binarize.apply
 
@@ -64,7 +65,7 @@ binarize = Binarize.apply
 
 
 class MomentumWithThresholdBinaryOptimizer(Optimizer):
-    def __init__(self, params, ar: float = 0.0001, threshold: float = 0):
+    def __init__(self, binary_params, bn_params, ar: float = 0.0001, threshold: float = 0):
         if not 0 < ar < 1:
             raise ValueError(
                 "given adaptivity rate {} is invalid; should be in (0, 1) (excluding endpoints)".format(
@@ -77,11 +78,14 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
             )
 
         self.total_weights = {}
+        self._adam = Adam(bn_params)
 
         defaults = dict(adaptivity_rate=ar, threshold=threshold)
-        super(MomentumWithThresholdBinaryOptimizer, self).__init__(params, defaults)
+        super(MomentumWithThresholdBinaryOptimizer, self).__init__(binary_params, defaults)
 
     def step(self, closure: Optional[Callable[[], float]] = ...):
+        self._adam.step()
+
         flips = {None}
 
         for group in self.param_groups:
@@ -100,12 +104,28 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 else:
                     m: Tensor = state["moving_average"]
 
-                    m.mul_(1 - y)
+                    m.mul_((1 - y))
                     m.add_(grad.mul(y))
 
                 mask = (m.abs() >= t) * (m.sign() == p.sign())
                 mask = mask.double() * -1
                 mask[mask == 0] = 1
+
+                if param_idx == len(params):
+                    print("p")
+                    print(p)
+                    print("grad")
+                    print(grad)
+                    print("m")
+                    print(m)
+                    print("threshold")
+                    print((m.abs() >= t))
+                    print("equal sign")
+                    print((m.sign() == p.sign()))
+
+                    print("mask")
+                    print((m.abs() >= t) * (m.sign() == p.sign()))
+                    print(mask)
 
                 flips[param_idx] = (mask == -1).sum().item()
 
@@ -113,6 +133,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
 
         return flips
 
+    def zero_grad(self) -> None:
+        super().zero_grad()
+        self._adam.zero_grad()
 
 class LatentWeightBinaryOptimizer:
     pass
@@ -173,6 +196,11 @@ class BinaryConv2d(nn.Conv2d):
 
         self.keep_latent_weight = keep_latent_weight
         self.binarize_input = binarize_input
+
+        if not self.keep_latent_weight:
+            with torch.no_grad():
+                self.weight.data.sign_()
+                self.bias.data.sign_() if self.bias is not None else None
 
     def forward(self, inp: Tensor) -> Tensor:
         if self.keep_latent_weight:
