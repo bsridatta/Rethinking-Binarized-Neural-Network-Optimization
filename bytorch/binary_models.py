@@ -52,7 +52,7 @@ class Binarize(Function):
 
         clipped = inp.abs() <= Binarize.clip_value
 
-        output = torch.zeros(inp.size())
+        output = torch.zeros(inp.size()).to(grad_output.device)
         output[clipped] = 1
         output[~clipped] = 0
 
@@ -65,7 +65,7 @@ binarize = Binarize.apply
 
 
 class MomentumWithThresholdBinaryOptimizer(Optimizer):
-    def __init__(self, binary_params, bn_params, ar: float = 0.0001, threshold: float = 0):
+    def __init__(self, binary_params, bn_params, ar: float = 0.0001, threshold: float = 0, adam_lr=0.001):
         if not 0 < ar < 1:
             raise ValueError(
                 "given adaptivity rate {} is invalid; should be in (0, 1) (excluding endpoints)".format(
@@ -78,7 +78,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
             )
 
         self.total_weights = {}
-        self._adam = Adam(bn_params)
+        self._adam = Adam(bn_params, lr=adam_lr)
 
         defaults = dict(adaptivity_rate=ar, threshold=threshold)
         super(MomentumWithThresholdBinaryOptimizer, self).__init__(binary_params, defaults)

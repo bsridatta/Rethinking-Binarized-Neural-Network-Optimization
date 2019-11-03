@@ -2,8 +2,11 @@
 This file defines the core research contribution
 """
 import os
+
 from collections import OrderedDict
+
 import numpy as np
+
 # import math
 
 import torch
@@ -29,7 +32,7 @@ train_val_transform = transforms.Compose(
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         # values are between [0, 1], we want [-1, 1]
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ]
 )
 
@@ -37,7 +40,7 @@ test_transform = transforms.Compose(
     [
         transforms.ToTensor(),
         # values are between [0, 1], we want [-1, 1]
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
     ]
 )
 
@@ -53,56 +56,136 @@ class BnnOnCIFAR10(pl.LightningModule):
         self.ar = hparams.adaptivity_rate
         self.t = hparams.threshold
         self.bs = hparams.batch_size
+        self.adam_lr = hparams.adam_lr
 
         self.features = nn.Sequential(
-            # layer 1
-            BinaryConv2d(3, 128, kernel_size=3,
-                         stride=1, padding=1, bias=True),
-            nn.BatchNorm2d(128),
-            nn.Hardtanh(inplace=True),
-            # layer 2
-            BinaryConv2d(128, 128, kernel_size=3,
-                         stride=1, padding=1, bias=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.BatchNorm2d(128),
-            nn.Hardtanh(inplace=True),
-            # layer 3
-            BinaryConv2d(128, 256, kernel_size=3,
-                         stride=1, padding=1, bias=True),
-            nn.BatchNorm2d(256),
-            nn.Hardtanh(inplace=True),
-            # layer 4
-            BinaryConv2d(256, 256, kernel_size=3,
-                         stride=1, padding=1, bias=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.BatchNorm2d(256),
-            nn.Hardtanh(inplace=True),
-            # layer 5
-            BinaryConv2d(256, 512, kernel_size=3,
-                         stride=1, padding=1, bias=True),
-            nn.BatchNorm2d(512),
-            nn.Hardtanh(inplace=True),
-            # layer 6
-            BinaryConv2d(512, 512, kernel_size=3,
-                         stride=1, padding=1, bias=True),
-            nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.BatchNorm2d(512),
-            nn.Hardtanh(inplace=True),
+            OrderedDict(
+                [
+                    # layer 1
+                    (
+                        "binary1",
+                        BinaryConv2d(
+                            3,
+                            128,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=True,
+                            binarize_input=False,
+                        ),
+                    ),
+                    ("bn1", nn.BatchNorm2d(128)),
+                    # layer 2
+                    (
+                        "binary2",
+                        BinaryConv2d(
+                            128,
+                            128,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=True,
+                            binarize_input=True,
+                        ),
+                    ),
+                    ("mp2", nn.MaxPool2d(kernel_size=2, stride=2)),
+                    ("bn2", nn.BatchNorm2d(128)),
+                    # layer 3
+                    (
+                        "binary3",
+                        BinaryConv2d(
+                            128,
+                            256,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=True,
+                            binarize_input=True,
+                        ),
+                    ),
+                    ("bn3", nn.BatchNorm2d(256)),
+                    # layer 4
+                    (
+                        "binary4",
+                        BinaryConv2d(
+                            256,
+                            256,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=True,
+                            binarize_input=True,
+                        ),
+                    ),
+                    ("mp4", nn.MaxPool2d(kernel_size=2, stride=2)),
+                    ("bn4", nn.BatchNorm2d(256)),
+                    # layer 5
+                    (
+                        "binary5",
+                        BinaryConv2d(
+                            256,
+                            512,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=True,
+                            binarize_input=True,
+                        ),
+                    ),
+                    ("bn5", nn.BatchNorm2d(512)),
+                    # layer 6
+                    (
+                        "binary6",
+                        BinaryConv2d(
+                            512,
+                            512,
+                            kernel_size=3,
+                            stride=1,
+                            padding=1,
+                            bias=True,
+                            binarize_input=True,
+                        ),
+                    ),
+                    ("mp6", nn.MaxPool2d(kernel_size=2, stride=2)),
+                    ("bn6", nn.BatchNorm2d(512)),
+                ]
+            )
         )
 
         self.classifier = nn.Sequential(
-            # layer 1
-            BinaryLinear(512 * 4 * 4, 1024, bias=True),
-            nn.BatchNorm1d(1024),
-            nn.Hardtanh(inplace=True),
-            # layer 2
-            BinaryLinear(1024, 1024, bias=True),
-            nn.BatchNorm1d(1024),
-            nn.Hardtanh(inplace=True),
-            # layer 3
-            BinaryLinear(1024, num_classes, bias=True),
-            nn.BatchNorm1d(num_classes, affine=False),
+            OrderedDict(
+                [
+                    # layer 7
+                    (
+                        "binary7",
+                        BinaryLinear(512 * 4 * 4, 1024, bias=True, binarize_input=True),
+                    ),
+                    ("bn7", nn.BatchNorm1d(1024)),
+                    # layer 8
+                    (
+                        "binary8",
+                        BinaryLinear(1024, 1024, bias=True, binarize_input=True),
+                    ),
+                    ("bn8", nn.BatchNorm1d(1024)),
+                    # layer 9
+                    (
+                        "binary9",
+                        BinaryLinear(1024, num_classes, bias=True, binarize_input=True),
+                    ),
+                    ("bn9", nn.BatchNorm1d(10)),
+                ]
+            )
         )
+
+    def binary_parameters(self):
+        for name, layer in self.named_parameters():
+            if "binary" in name:
+                yield layer
+
+    def non_binary_parameters(self):
+        for name, layer in self.named_parameters():
+            if "bn" in name:
+                yield layer
 
     def forward(self, x):
         # REQUIRED
@@ -120,16 +203,16 @@ class BnnOnCIFAR10(pl.LightningModule):
         labels_hat = torch.argmax(y_hat, dim=1)
         train_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
         train_loss = F.cross_entropy(y_hat, y)
-        logger_logs = {'train_acc': train_acc,
-                       'train_loss': train_loss
-                       }
+        logger_logs = {"train_acc": train_acc, "train_loss": train_loss}
 
         # loss is strictly required
-        output = OrderedDict({
-            "loss": train_loss,
-            "progress_bar": {"train_acc": train_acc},
-            "log": logger_logs
-        })
+        output = OrderedDict(
+            {
+                "loss": train_loss,
+                "progress_bar": {"train_acc": train_acc},
+                "log": logger_logs,
+            }
+        )
 
         return output
 
@@ -143,10 +226,9 @@ class BnnOnCIFAR10(pl.LightningModule):
         val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
         val_loss = F.cross_entropy(y_hat, y)
 
-        output = OrderedDict({
-            "val_loss": val_loss,
-            "val_acc":  torch.tensor(val_acc)  # must be a tensor
-        })
+        output = OrderedDict(
+            {"val_loss": val_loss, "val_acc": torch.tensor(val_acc)}  # must be a tensor
+        )
 
         return output
 
@@ -156,22 +238,21 @@ class BnnOnCIFAR10(pl.LightningModule):
         """
         # The outputs here are strictly for progress bar
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
-        avg_acc = torch.stack([x['val_acc'] for x in outputs]).mean()
+        avg_acc = torch.stack([x["val_acc"] for x in outputs]).mean()
 
-        logger_logs = {'val_avg_acc': avg_acc,
-                       'val_avg_loss': avg_loss
-                       }
+        logger_logs = {"val_avg_acc": avg_acc, "val_avg_loss": avg_loss}
 
-        output = OrderedDict({
-            "progress_bar": logger_logs,
-            "log": logger_logs
-        })
+        output = OrderedDict({"progress_bar": logger_logs, "log": logger_logs})
 
         return output
 
     def configure_optimizers(self):
         optimizer = MomentumWithThresholdBinaryOptimizer(
-            self.parameters(), ar=self.ar, threshold=self.t
+            self.binary_parameters(),
+            self.non_binary_parameters(),
+            ar=self.ar,
+            threshold=self.t,
+            adam_lr=self.adam_lr
         )
 
         for param_idx, p in enumerate(self.parameters()):
@@ -179,7 +260,9 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         return optimizer
 
-    def optimizer_step(self, current_epoch, batch_nb, optimizer, optimizer_i, second_order_closure=None):
+    def optimizer_step(
+        self, current_epoch, batch_nb, optimizer, optimizer_i, second_order_closure=None
+    ):
         """
         Adaptivity rate decay
         """
@@ -189,13 +272,12 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         # update params - optimizer step
         flips_curr_step = optimizer.step()
-        pi = np.asarray([0]*len(optimizer.total_weights.keys()))
+        pi = np.asarray([0] * len(optimizer.total_weights.keys()))
 
         for idx in flips_curr_step.keys() & optimizer.total_weights.keys():
-            pi[idx] = flips_curr_step[idx] / \
-                optimizer.total_weights[idx] + 10**-9
+            pi[idx] = flips_curr_step[idx] / optimizer.total_weights[idx] + 10 ** -9
 
-        ''' log pi from layer 0 to 33 '''
+        """ log pi from layer 0 to 33 """
         # self.logger.experiment.add_histogram(
         #     tag="b"+str(batch_nb), values=pi, global_step=self.trainer.global_step)
 
@@ -206,27 +288,24 @@ class BnnOnCIFAR10(pl.LightningModule):
         if self.trainer.global_step % 1000 == 0:
             for id, p in enumerate(self.parameters()):
                 self.logger.experiment.add_histogram(
-                    tag="l"+str(id), values=p, global_step=self.trainer.global_step)
+                    tag="l" + str(id), values=p, global_step=self.trainer.global_step
+                )
 
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
         train_data = CIFAR10(
-            os.getcwd(),
-            train=True,
-            download=True,
-            transform=train_val_transform
+            os.getcwd(), train=True, download=True, transform=train_val_transform
         )
 
         start = 0
-        end = 5  # 0000
+        end = 50000
 
-        data_loader = DataLoader(train_data,
-                                 batch_size=self.hparams.batch_size,
-                                 sampler=SubsetRandomSampler(
-                                     range(start, end)
-                                 )
-                                 )
+        data_loader = DataLoader(
+            train_data,
+            batch_size=self.hparams.batch_size,
+            # sampler=SubsetRandomSampler(range(start, end)),
+        )
 
         print("train len ", len(data_loader))
         return data_loader
@@ -235,21 +314,17 @@ class BnnOnCIFAR10(pl.LightningModule):
     def val_dataloader(self):
         # OPTIONAL
         val_data = CIFAR10(
-            os.getcwd(),
-            train=True,
-            download=True,
-            transform=train_val_transform
+            os.getcwd(), train=True, download=True, transform=train_val_transform
         )
 
         start = 0  # 40000
         end = 5  # 0000  # len(val_data)
 
-        data_loader = DataLoader(val_data,
-                                 batch_size=self.hparams.batch_size,
-                                 sampler=SubsetRandomSampler(
-                                     range(start, end)
-                                 )
-                                 )
+        data_loader = DataLoader(
+            val_data,
+            batch_size=self.hparams.batch_size,
+            sampler=SubsetRandomSampler(range(start, end)),
+        )
 
         print("val len ", len(data_loader))
         return data_loader
@@ -258,8 +333,7 @@ class BnnOnCIFAR10(pl.LightningModule):
     def test_dataloader(self):
         # OPTIONAL
         return DataLoader(
-            CIFAR10(os.getcwd(), train=False, download=True,
-                    transform=test_transform),
+            CIFAR10(os.getcwd(), train=False, download=True, transform=test_transform),
             batch_size=self.hparams.batch_size,
         )
 
@@ -270,8 +344,9 @@ class BnnOnCIFAR10(pl.LightningModule):
         """
         # MODEL specific
         parser = ArgumentParser(parents=[parent_parser])
-        parser.add_argument("--adaptivity-rate", default=10**-4, type=float)
-        parser.add_argument("--threshold", default=10**-8, type=float)
+        parser.add_argument("--adaptivity-rate", default=10 ** -4, type=float)
+        parser.add_argument("--threshold", default=10 ** -8, type=float)
         parser.add_argument("--batch_size", default=50, type=int)
+        parser.add_argument("--adam-lr", default=0.01, type=float)
 
         return parser
