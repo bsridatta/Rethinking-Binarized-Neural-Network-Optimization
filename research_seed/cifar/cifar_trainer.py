@@ -20,7 +20,7 @@ def main(hparams):
 
 if __name__ == "__main__":
     parser = ArgumentParser(add_help=False)
-    parser.add_argument("--gpus", type=str, default=0)
+    parser.add_argument("--gpus", type=str, default=1)
     parser.add_argument("--nodes", type=int, default=1)
     parser.add_argument("--max_nb_epochs", default=100, type=int)
 
