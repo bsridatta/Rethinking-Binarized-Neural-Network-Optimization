@@ -27,10 +27,10 @@ def main(hparams):
         max_nb_epochs=hparams.max_nb_epochs,
         gpus=hparams.gpus,
         nb_gpu_nodes=hparams.nodes,
-        overfit_pct=0.001,
         # checkpoint_callback=checkpoint_callback
         default_save_path="../../results",
-        check_val_every_n_epoch=25
+        check_val_every_n_epoch=5,
+        show_progress_bar=True,
     )
 
     trainer.fit(model)

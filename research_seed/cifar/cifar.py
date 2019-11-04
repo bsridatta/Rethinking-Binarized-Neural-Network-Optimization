@@ -59,8 +59,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         self.adam_lr = hparams.adam_lr
         self.decay_n_epochs = hparams.decay_n_epochs
         self.decay_exponential = hparams.decay_exponential
-
-        print(self.decay_n_epochs, self.decay_exponential)
+        self.split = hparams.train_val_split
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -233,11 +232,12 @@ class BnnOnCIFAR10(pl.LightningModule):
         val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
         val_loss = F.cross_entropy(y_hat, y)
 
-        output = OrderedDict(
-            {"val_loss": val_loss, "val_acc": torch.tensor(val_acc)}  # must be a tensor
+        return OrderedDict(
+            {
+                "val_loss": val_loss.clone().detach(),
+                "val_acc": torch.tensor(val_acc),
+            }
         )
-
-        return output
 
     def validation_end(self, outputs):
         """
@@ -268,14 +268,12 @@ class BnnOnCIFAR10(pl.LightningModule):
         """
         Adaptivity rate decay
         """
-        if self._prev_epoch is not current_epoch:
-            self._prev_epoch = current_epoch
-        else:
-            return
-
-        # Decay every 100 epochs
-        if current_epoch % self.decay_n_epochs == 0 and current_epoch != 0:
-            print("reduced :o")
+        # Decay every n epochs
+        if (
+            batch_nb == 0
+            and current_epoch % self.decay_n_epochs == 0
+            and current_epoch != 0
+        ):
             self.ar *= self.decay_exponential
 
         # update params - optimizer step
@@ -288,6 +286,16 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         optimizer.zero_grad()
 
+    def get_train_val_sampler(self, num_samples):
+        indices = list(range(num_samples))
+        split = int(np.floor(self.split * num_samples))
+
+        train_idx, valid_idx = indices[:split], indices[split:]
+        train_sampler = SubsetRandomSampler(train_idx)
+        val_sampler = SubsetRandomSampler(valid_idx)
+
+        return train_sampler, val_sampler
+
     @pl.data_loader
     def train_dataloader(self):
         # REQUIRED
@@ -295,7 +303,9 @@ class BnnOnCIFAR10(pl.LightningModule):
             os.getcwd(), train=True, download=True, transform=train_val_transform
         )
 
-        data_loader = DataLoader(train_data, batch_size=self.hparams.batch_size)
+        train_sampler, _ = self.get_train_val_sampler(len(train_data))
+
+        data_loader = DataLoader(train_data, batch_size=self.bs, sampler=train_sampler)
 
         print("train len ", len(data_loader))
         return data_loader
@@ -307,7 +317,9 @@ class BnnOnCIFAR10(pl.LightningModule):
             os.getcwd(), train=True, download=True, transform=train_val_transform
         )
 
-        data_loader = DataLoader(val_data, batch_size=self.hparams.batch_size)
+        _, val_sampler = self.get_train_val_sampler(len(val_data))
+
+        data_loader = DataLoader(val_data, batch_size=self.bs, sampler=val_sampler)
 
         print("val len ", len(data_loader))
         return data_loader
@@ -333,5 +345,6 @@ class BnnOnCIFAR10(pl.LightningModule):
         parser.add_argument("--adam-lr", default=0.01, type=float)
         parser.add_argument("--decay-n-epochs", default=100, type=int)
         parser.add_argument("--decay-exponential", default=0.1, type=float)
+        parser.add_argument("--train-val-split", default=0.90, type=float)
 
         return parser
