@@ -30,7 +30,7 @@ def main(hparams):
         # checkpoint_callback=checkpoint_callback
         default_save_path="../../results",
         check_val_every_n_epoch=1,
-        show_progress_bar=True
+        show_progress_bar=True,
     )
 
     trainer.fit(model)

@@ -232,11 +232,12 @@ class BnnOnCIFAR10(pl.LightningModule):
         val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
         val_loss = F.cross_entropy(y_hat, y)
 
-        output = OrderedDict(
-            {"val_loss": val_loss, "val_acc": torch.tensor(val_acc)}  # must be a tensor
+        return OrderedDict(
+            {
+                "val_loss": val_loss.clone().detach(),
+                "val_acc": torch.tensor(val_acc),
+            }
         )
-
-        return output
 
     def validation_end(self, outputs):
         """
