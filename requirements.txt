@@ -1,10 +1,5 @@
-tensorflow==2.0.0rc2
-tensorflow-gpu==2.0.0rc2
-matplotlib
+setuptools==41.6.0 
 torch
 torchvision
 torchsummary
 pytorch-lightning
-keras
-larq
-tf-nightly-2.0-preview
