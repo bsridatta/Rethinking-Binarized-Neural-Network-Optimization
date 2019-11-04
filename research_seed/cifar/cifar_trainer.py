@@ -29,7 +29,7 @@ def main(hparams):
         nb_gpu_nodes=hparams.nodes,
         # checkpoint_callback=checkpoint_callback
         default_save_path="../../results",
-        check_val_every_n_epoch=,
+        check_val_every_n_epoch=5,
         show_progress_bar=True,
     )
 
