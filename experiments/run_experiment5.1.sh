@@ -1,4 +1,4 @@
-DEBUG_RUN=0
+DEBUG_RUN=0 # 1=True, 0=False
 
 # constant threshold 10-6, test adativity rate 10e-2, 10e-3, 10e-4
 python3 ../research_seed/cifar/cifar_trainer.py \
@@ -81,4 +81,4 @@ python3 ../research_seed/cifar/cifar_trainer.py \
   --decay-exponential 0.1 \
   --train-val-split 0.9
 
-#sudo shutdown now
+sudo shutdown now
