@@ -57,6 +57,10 @@ class BnnOnCIFAR10(pl.LightningModule):
         self.t = hparams.threshold
         self.bs = hparams.batch_size
         self.adam_lr = hparams.adam_lr
+        self.decay_n_epochs = hparams.decay_n_epochs
+        self.decay_exponential = hparams.decay_exponential
+
+        print(self.decay_n_epochs, self.decay_exponential)
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -177,6 +181,9 @@ class BnnOnCIFAR10(pl.LightningModule):
             )
         )
 
+        self._num_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        self._prev_epoch = -1
+
     def binary_parameters(self):
         for name, layer in self.named_parameters():
             if "binary" in name:
@@ -240,25 +247,20 @@ class BnnOnCIFAR10(pl.LightningModule):
         avg_loss = torch.stack([x["val_loss"] for x in outputs]).mean()
         avg_acc = torch.stack([x["val_acc"] for x in outputs]).mean()
 
-        logger_logs = {"val_avg_acc": avg_acc, "val_avg_loss": avg_loss}
+        logger_logs = {"val_acc": avg_acc, "val_loss": avg_loss}
 
         output = OrderedDict({"progress_bar": logger_logs, "log": logger_logs})
 
         return output
 
     def configure_optimizers(self):
-        optimizer = MomentumWithThresholdBinaryOptimizer(
+        return MomentumWithThresholdBinaryOptimizer(
             self.binary_parameters(),
             self.non_binary_parameters(),
             ar=self.ar,
             threshold=self.t,
-            adam_lr=self.adam_lr
+            adam_lr=self.adam_lr,
         )
-
-        for param_idx, p in enumerate(self.parameters()):
-            optimizer.total_weights[param_idx] = len(p)
-
-        return optimizer
 
     def optimizer_step(
         self, current_epoch, batch_nb, optimizer, optimizer_i, second_order_closure=None
@@ -266,30 +268,25 @@ class BnnOnCIFAR10(pl.LightningModule):
         """
         Adaptivity rate decay
         """
+        if self._prev_epoch is not current_epoch:
+            self._prev_epoch = current_epoch
+        else:
+            return
+
         # Decay every 100 epochs
-        if current_epoch % 100 == 0:
-            self.ar *= 0.1
+        if current_epoch % self.decay_n_epochs == 0 and current_epoch != 0:
+            print("reduced :o")
+            self.ar *= self.decay_exponential
 
         # update params - optimizer step
-        flips_curr_step = optimizer.step()
-        pi = np.asarray([0] * len(optimizer.total_weights.keys()))
+        flips_curr_step = optimizer.step(ar=self.ar)
 
-        for idx in flips_curr_step.keys() & optimizer.total_weights.keys():
-            pi[idx] = flips_curr_step[idx] / optimizer.total_weights[idx] + 10 ** -9
+        sum_flips = sum(flips_curr_step.values())
+        pi = np.log(sum_flips / (self._num_params + np.e - 9))
 
-        """ log pi from layer 0 to 33 """
-        # self.logger.experiment.add_histogram(
-        #     tag="b"+str(batch_nb), values=pi, global_step=self.trainer.global_step)
+        self.logger.experiment.log(({"pi": pi, "flips": sum_flips, "ar": self.ar}))
 
         optimizer.zero_grad()
-
-    def on_after_backward(self):
-        # logging updated weights
-        if self.trainer.global_step % 1000 == 0:
-            for id, p in enumerate(self.parameters()):
-                self.logger.experiment.add_histogram(
-                    tag="l" + str(id), values=p, global_step=self.trainer.global_step
-                )
 
     @pl.data_loader
     def train_dataloader(self):
@@ -298,14 +295,7 @@ class BnnOnCIFAR10(pl.LightningModule):
             os.getcwd(), train=True, download=True, transform=train_val_transform
         )
 
-        start = 0
-        end = 50000
-
-        data_loader = DataLoader(
-            train_data,
-            batch_size=self.hparams.batch_size,
-            # sampler=SubsetRandomSampler(range(start, end)),
-        )
+        data_loader = DataLoader(train_data, batch_size=self.hparams.batch_size)
 
         print("train len ", len(data_loader))
         return data_loader
@@ -317,14 +307,7 @@ class BnnOnCIFAR10(pl.LightningModule):
             os.getcwd(), train=True, download=True, transform=train_val_transform
         )
 
-        start = 0  # 40000
-        end = 5  # 0000  # len(val_data)
-
-        data_loader = DataLoader(
-            val_data,
-            batch_size=self.hparams.batch_size,
-            sampler=SubsetRandomSampler(range(start, end)),
-        )
+        data_loader = DataLoader(val_data, batch_size=self.hparams.batch_size)
 
         print("val len ", len(data_loader))
         return data_loader
@@ -348,5 +331,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         parser.add_argument("--threshold", default=10 ** -8, type=float)
         parser.add_argument("--batch_size", default=50, type=int)
         parser.add_argument("--adam-lr", default=0.01, type=float)
+        parser.add_argument("--decay-n-epochs", default=100, type=int)
+        parser.add_argument("--decay-exponential", default=0.1, type=float)
 
         return parser

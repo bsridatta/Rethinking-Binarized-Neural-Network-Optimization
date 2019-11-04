@@ -83,7 +83,7 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
         defaults = dict(adaptivity_rate=ar, threshold=threshold)
         super(MomentumWithThresholdBinaryOptimizer, self).__init__(binary_params, defaults)
 
-    def step(self, closure: Optional[Callable[[], float]] = ...):
+    def step(self, closure: Optional[Callable[[], float]] = ..., ar=None):
         self._adam.step()
 
         flips = {None}
@@ -94,6 +94,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
             y = group["adaptivity_rate"]
             t = group["threshold"]
             flips = {}
+
+            if ar is not None:
+                y = ar
 
             for param_idx, p in enumerate(params):
                 grad = p.grad.data
