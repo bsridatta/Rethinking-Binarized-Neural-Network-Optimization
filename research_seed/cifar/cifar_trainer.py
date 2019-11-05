@@ -2,6 +2,7 @@
 This file runs the main training/val loop, etc... using Lightning Trainer"""
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
+from test_tube import Experiment
 
 from argparse import ArgumentParser
 
@@ -9,22 +10,28 @@ from cifar import BnnOnCIFAR10
 
 
 def main(hparams):
+    print(hparams)
+
     # init module
     model = BnnOnCIFAR10(hparams)
 
-    hparams.debug = bool(hparams.debug)
-    print(hparams)
+    if hparams.restart_from_checkpoint:
+        exp = Experiment(hparams.restart_from_checkpoint)
+        trainer = Trainer(experiment=exp)
 
-    # most basic trainer, uses good defaults
-    trainer = Trainer(
-        max_nb_epochs=hparams.max_nb_epochs,
-        gpus=hparams.gpus,
-        nb_gpu_nodes=hparams.nodes,
-        check_val_every_n_epoch=5,
-        show_progress_bar=True,
-        overfit_pct=hparams.overfit_pct,
-        fast_dev_run=hparams.debug
-    )
+    else:
+        hparams.debug = bool(hparams.debug)
+
+        # most basic trainer, uses good defaults
+        trainer = Trainer(
+            max_nb_epochs=hparams.max_nb_epochs,
+            gpus=hparams.gpus,
+            nb_gpu_nodes=hparams.nodes,
+            check_val_every_n_epoch=5,
+            show_progress_bar=True,
+            overfit_pct=hparams.overfit_pct,
+            fast_dev_run=hparams.debug,
+        )
 
     trainer.fit(model)
 
@@ -36,6 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_nb_epochs", default=500, type=int)
     parser.add_argument("--debug", default=0, type=int, choices=[0, 1])
     parser.add_argument("--overfit_pct", default=0.00, type=float)
+    parser.add_argument("--restart-from-checkpoint", default=None, type=str)
 
     # give the module a chance to add own params
     # good practice to define LightningModule specific params in the module
