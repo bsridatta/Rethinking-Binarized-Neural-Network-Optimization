@@ -233,10 +233,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         val_loss = F.cross_entropy(y_hat, y)
 
         return OrderedDict(
-            {
-                "val_loss": val_loss.clone().detach(),
-                "val_acc": torch.tensor(val_acc),
-            }
+            {"val_loss": val_loss.clone().detach(), "val_acc": torch.tensor(val_acc)}
         )
 
     def validation_end(self, outputs):
@@ -252,6 +249,25 @@ class BnnOnCIFAR10(pl.LightningModule):
         output = OrderedDict({"progress_bar": logger_logs, "log": logger_logs})
 
         return output
+
+    def test_step(self, batch, batch_nb):
+        x, y = batch
+        y_hat = self.forward(x)
+
+        # validation metrics for monitoring
+        labels_hat = torch.argmax(y_hat, dim=1)
+        val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
+        val_loss = F.cross_entropy(y_hat, y)
+
+        return OrderedDict(
+            {"test_loss": val_loss.clone().detach(), "test_acc": torch.tensor(val_acc)}
+        )
+
+    def test_end(self, outputs):
+        avg_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
+        avg_acc = torch.stack([x["test_acc"] for x in outputs]).mean()
+
+        return OrderedDict({"log": {"test_acc": avg_acc, "test_loss": avg_loss}})
 
     def configure_optimizers(self):
         return MomentumWithThresholdBinaryOptimizer(
