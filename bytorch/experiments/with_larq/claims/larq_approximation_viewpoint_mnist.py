@@ -213,14 +213,14 @@ def plot_results():
 
 
 if __name__ == "__main__":
-    # results = []
-    # for i in range(0, 10):
-    #     results.append(main(with_bm=True))
-    #
-    # print(results)
-    #
-    # with open("approx_mnist/results.txt", 'w') as f:
-    #     f.write(str(results))
+    results = []
+    for i in range(0, 10):
+        results.append(main(with_bm=True))
+
+    print(results)
+
+    with open("approx_mnist/results.txt", 'w') as f:
+        f.write(str(results))
 
     result_stats()
     plot_results()

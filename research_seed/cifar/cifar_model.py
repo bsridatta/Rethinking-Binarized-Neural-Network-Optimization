@@ -304,7 +304,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         flips_curr_step = optimizer.step(ar=self.ar)
 
         sum_flips = sum(flips_curr_step.values())
-        pi = np.log(sum_flips / (self._num_params + np.e - 9))
+        pi = np.log((sum_flips / self._num_params) + (np.e ** -9))
 
         self.logger.experiment.log(({"pi": pi, "flips": sum_flips, "ar": self.ar}))
 
