@@ -262,7 +262,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         return OrderedDict(
             {
                 "test_loss": test_loss.clone().detach(),
-                "test_acc": torch.tensor(test_acc)
+                "test_acc": torch.tensor(test_acc),
             }
         )
 
@@ -312,11 +312,17 @@ class BnnOnCIFAR10(pl.LightningModule):
 
     def get_train_val_sampler(self, num_samples):
         indices = list(range(num_samples))
-        split = int(np.floor(self.split * num_samples))
 
-        train_idx, valid_idx = indices[:split], indices[split:]
+        if self.split == 1:
+            train_idx = indices
+            split_idx_val = int(np.floor(0.1 * num_samples))
+            val_idx = indices[:split_idx_val]
+        else:
+            split_idx = int(np.floor(self.split * num_samples))
+            train_idx, val_idx = indices[:split_idx], indices[split_idx:]
+
         train_sampler = SubsetRandomSampler(train_idx)
-        val_sampler = SubsetRandomSampler(valid_idx)
+        val_sampler = SubsetRandomSampler(val_idx)
 
         return train_sampler, val_sampler
 
