@@ -6,7 +6,7 @@ from test_tube import Experiment
 
 from argparse import ArgumentParser
 
-from cifar import BnnOnCIFAR10
+from cifar_model import BnnOnCIFAR10
 
 
 def main(hparams):
