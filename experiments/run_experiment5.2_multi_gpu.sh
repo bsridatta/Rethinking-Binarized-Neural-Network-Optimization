@@ -1,7 +1,7 @@
 DEBUG_RUN=0 # 1=True, 0=False
 
 python3.6 ../research_seed/cifar/cifar_trainer.py \
-  --gpus [0, 1] \
+  --gpus "0,1" \
   --nodes 1 \
   --max_nb_epochs 500 \
   --debug $DEBUG_RUN \
