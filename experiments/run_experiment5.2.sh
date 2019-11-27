@@ -13,4 +13,4 @@ python3 ../research_seed/cifar/cifar_trainer.py \
   --decay-exponential 0.1 \
   --train-val-split 0.9
 
-sudo shutnow now
+sudo shutdown now
