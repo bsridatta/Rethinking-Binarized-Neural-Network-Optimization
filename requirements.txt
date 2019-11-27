@@ -2,4 +2,4 @@ setuptools==41.6.0
 torch
 torchvision
 torchsummary
-pytorch-lightning
+git+https://github.com/nikvaessen/pytorch-lightning@master#egg=pytorch-lightning

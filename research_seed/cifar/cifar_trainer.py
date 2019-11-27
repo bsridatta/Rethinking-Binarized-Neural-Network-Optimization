@@ -1,7 +1,7 @@
 """
 This file runs the main training/val loop, etc... using Lightning Trainer"""
 from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from test_tube import Experiment
 
 from argparse import ArgumentParser
@@ -21,16 +21,28 @@ def main(hparams):
 
     else:
         hparams.debug = bool(hparams.debug)
+        hparams.early_stopping = bool(hparams.early_stopping)
+
+        if hparams.early_stopping:
+            early_stop_callback = EarlyStopping(
+                monitor='val_loss',
+                min_delta=0.00,
+                patience=3,
+                verbose=False,
+                mode='min'
+            )
+        else:
+            early_stop_callback = None
 
         # most basic trainer, uses good defaults
         trainer = Trainer(
             max_nb_epochs=hparams.max_nb_epochs,
             gpus=hparams.gpus,
             nb_gpu_nodes=hparams.nodes,
-            check_val_every_n_epoch=5,
             show_progress_bar=True,
             overfit_pct=hparams.overfit_pct,
             fast_dev_run=hparams.debug,
+            early_stop_callback=early_stop_callback
         )
 
     trainer.fit(model)
@@ -44,6 +56,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", default=0, type=int, choices=[0, 1])
     parser.add_argument("--overfit_pct", default=0.00, type=float)
     parser.add_argument("--restart-from-checkpoint", default=None, type=str)
+    parser.add_argument("--early-stopping", default=0, type=int, choices=[0, 1])
 
     # give the module a chance to add own params
     # good practice to define LightningModule specific params in the module
