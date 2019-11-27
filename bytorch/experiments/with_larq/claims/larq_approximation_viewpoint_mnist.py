@@ -155,9 +155,15 @@ def main(with_bm=True):
 
     real_model_retrained_acc, _ = test_model(real_weight_model)
 
+    # set the retrained batch norm layers again on the binary network
+    binary_weight_model.set_weights(real_weight_model.get_weights())
+
+    binary_weight_model_acc_retrained = test_model(binary_weight_model)
+
     print(f"binary model accuracy: {binary_model_acc:.2f}")
     print(f"real model accuracy: {real_model_acc:.2f}")
     print(f"real model retrained accuracy: {real_model_retrained_acc:.2f}")
+    print(f"binary model retrained accuracy: {binary_weight_model_acc_retrained}")
 
     return binary_model_acc, real_model_acc, real_model_retrained_acc
 
@@ -222,5 +228,5 @@ if __name__ == "__main__":
     with open("approx_mnist/results.txt", 'w') as f:
         f.write(str(results))
 
-    result_stats()
-    plot_results()
+    # result_stats()
+    # plot_results()
