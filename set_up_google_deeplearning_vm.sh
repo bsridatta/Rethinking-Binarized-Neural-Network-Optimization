@@ -29,6 +29,7 @@ sudo make altinstall
 cd ..
 
 # install project dependencies
+sudo pip3.6 install --upgrade pip
 sudo pip3.6 install --upgrade setuptools
 sudo pip3.6 install -r requirements.txt
 
