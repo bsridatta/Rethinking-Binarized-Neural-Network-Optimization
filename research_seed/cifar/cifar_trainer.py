@@ -38,6 +38,7 @@ def main(hparams):
         trainer = Trainer(
             max_nb_epochs=hparams.max_nb_epochs,
             gpus=hparams.gpus,
+            distributed_backend="dp" if hparams.gpus != 1 else None,
             nb_gpu_nodes=hparams.nodes,
             show_progress_bar=True,
             overfit_pct=hparams.overfit_pct,
