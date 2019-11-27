@@ -256,18 +256,26 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         # validation metrics for monitoring
         labels_hat = torch.argmax(y_hat, dim=1)
-        val_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
-        val_loss = F.cross_entropy(y_hat, y)
+        test_acc = torch.sum(y == labels_hat).item() / (len(y) * 1.0)
+        test_loss = F.cross_entropy(y_hat, y)
 
         return OrderedDict(
-            {"test_loss": val_loss.clone().detach(), "test_acc": torch.tensor(val_acc)}
+            {
+                "test_loss": test_loss.clone().detach(),
+                "test_acc": torch.tensor(test_acc)
+            }
         )
 
     def test_end(self, outputs):
         avg_loss = torch.stack([x["test_loss"] for x in outputs]).mean()
         avg_acc = torch.stack([x["test_acc"] for x in outputs]).mean()
 
-        return OrderedDict({"log": {"test_acc": avg_acc, "test_loss": avg_loss}})
+        return OrderedDict(
+            {
+                "progress_bar": {"loss": avg_loss, "accuracy": avg_acc},
+                "log": {"test_acc": avg_acc, "test_loss": avg_loss},
+            }
+        )
 
     def configure_optimizers(self):
         return MomentumWithThresholdBinaryOptimizer(
@@ -296,7 +304,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         flips_curr_step = optimizer.step(ar=self.ar)
 
         sum_flips = sum(flips_curr_step.values())
-        pi = np.log(sum_flips / (self._num_params + np.e - 9))
+        pi = np.log((sum_flips / self._num_params) + (np.e ** -9))
 
         self.logger.experiment.log(({"pi": pi, "flips": sum_flips, "ar": self.ar}))
 
