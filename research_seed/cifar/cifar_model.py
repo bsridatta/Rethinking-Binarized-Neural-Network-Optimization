@@ -60,6 +60,7 @@ class BnnOnCIFAR10(pl.LightningModule):
         self.decay_n_epochs = hparams.decay_n_epochs
         self.decay_exponential = hparams.decay_exponential
         self.split = hparams.train_val_split
+        self.num_data_loaders = hparams.num_data_loaders
 
         self.features = nn.Sequential(
             OrderedDict(
@@ -335,7 +336,12 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         train_sampler, _ = self.get_train_val_sampler(len(train_data))
 
-        data_loader = DataLoader(train_data, batch_size=self.bs, sampler=train_sampler)
+        data_loader = DataLoader(
+            train_data,
+            num_workers=self.num_data_loaders,
+            batch_size=self.bs,
+            sampler=train_sampler,
+        )
 
         print("train len ", len(data_loader))
         return data_loader
@@ -349,7 +355,12 @@ class BnnOnCIFAR10(pl.LightningModule):
 
         _, val_sampler = self.get_train_val_sampler(len(val_data))
 
-        data_loader = DataLoader(val_data, batch_size=self.bs, sampler=val_sampler)
+        data_loader = DataLoader(
+            val_data,
+            num_workers=self.num_data_loaders,
+            batch_size=self.bs,
+            sampler=val_sampler,
+        )
 
         print("val len ", len(data_loader))
         return data_loader
