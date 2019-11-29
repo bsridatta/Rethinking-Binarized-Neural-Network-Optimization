@@ -85,9 +85,7 @@ def build_model(
 def train_model(model, epochs=4):
     (train_images, train_labels), _ = get_cifar_data()
     tb = tk.callbacks.TensorBoard(
-        log_dir=f"./theorem/exper_{hparams.init[0:2]} \
-                                 _{hparams.optim[0:2]} \
-                                 _{hparams.lr}",
+        log_dir=f"./theorem/exper_{hparams.init[0:2]}_{hparams.optim[0:2]}_{str(hparams.lr)}",
         histogram_freq=0,
         write_graph=True,
     )
@@ -138,8 +136,8 @@ if __name__ == "__main__":
     
     parser = ArgumentParser(add_help=False)
     parser.add_argument("--lr", type=float, default=0.01)
-    parser.add_argument("--epochs", type=int, default=1)
-    parser.add_argument("--optim", type=str, default="Adam")
+    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--optim", type=str, default="SGD")
     parser.add_argument("--init", type=str, default="random_uniform")
     
     hparams = parser.parse_args()
