@@ -42,7 +42,7 @@ raw/
 lightning_logs/
 cifar-10-batches-py/
 cifar-10-python.tar.gz
-
+theorem/
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
