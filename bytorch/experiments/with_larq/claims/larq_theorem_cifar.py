@@ -85,7 +85,7 @@ def build_model(
 def train_model(model, epochs=4):
     (train_images, train_labels), _ = get_cifar_data()
     tb = tk.callbacks.TensorBoard(
-        log_dir=f"./theorem/exper_{hparams.init[0:2]}_{hparams.optim[0:2]}_{str(hparams.lr)}",
+        log_dir=f"./theorem/exper_{hparams.init[0:2]}_{hparams.optim[0:2]}_{str(hparams.lr)}_{str(scaling)}",
         histogram_freq=0,
         write_graph=True,
     )
@@ -141,6 +141,11 @@ if __name__ == "__main__":
     parser.add_argument("--init", type=str, default="random_uniform")
     
     hparams = parser.parse_args()
+    scaling = False
+    
+    if hparams.init == 'scaled_glorot_uniform':
+        scaling = True
+        hparams.init = 'glorot_uniform'
     
     binary_weight_model: tk.Model = build_model(
         use_binary_weights=True,
@@ -150,7 +155,7 @@ if __name__ == "__main__":
         optimizer=hparams.optim
     )
 
-    if hparams.init == "scaled_glorot_uniform":
+    if scaling:
         for layer in binary_weight_model.layers: 
             weights = layer.get_weights()
             new_weights = []
@@ -158,6 +163,7 @@ if __name__ == "__main__":
                 weight = np.multiply(weight, 0.01)
                 new_weights.append(weight)            
             layer.set_weights(new_weights)
+
     # Train a model with binary weights
     train_model(binary_weight_model, epochs=hparams.epochs)
     binary_model_acc, _ = test_model(binary_weight_model)
