@@ -1,11 +1,12 @@
 import larq as lq
 import tensorflow as tf
 import tensorflow.keras as tk
+import numpy as np
+
+from scipy.stats import f_oneway
 
 from typing import List
-
 from time import time
-import json
 
 
 def get_mnist_data():
@@ -169,6 +170,7 @@ def main(with_bm=True):
 
 
 def result_stats():
+    # copied from results.txt
     res = [
         (0.9839, 0.1033, 0.9814),
         (0.9529, 0.1032, 0.9811),
@@ -181,52 +183,48 @@ def result_stats():
         (0.982, 0.1032, 0.9803),
         (0.9323, 0.1032, 0.9805),
     ]
+
     bin = []
     real = []
     real_retrained = []
+
     for r in res:
         bin += [r[0]]
         real += [r[1]]
         real_retrained += [r[2]]
 
-    import numpy as np
-
     bin = np.array(bin)
     real = np.array(real)
     real_retrained = np.array(real_retrained)
 
-    print("1")
+    f, pvalue = f_oneway(bin, real, real_retrained)
+
+    print("binary")
     print(np.mean(bin))
-    print(np.var(bin))
+    print(np.std(bin))
 
-    print("2")
+    print("latent")
     print(np.mean(real))
-    print(np.var(real))
+    print(np.std(real))
 
-    print("3")
+    print("latent retrained")
     print(np.mean(real_retrained))
-    print(np.var(real_retrained))
+    print(np.std(real_retrained))
 
-
-def plot_results():
-    fn1 = "run-experiment__1572644426.4495745_train-tag-epoch_accuracy.json"
-    fn2 = "run-experiment__1572644519.5294988_train-tag-epoch_accuracy.json"
-
-    dp1 = json.load(open(fn1))
-    dp2 = json.load(open(fn2))
-
-    print(dp1)
+    print("significant")
+    print("f", f, "p", pvalue)
 
 
 if __name__ == "__main__":
-    results = []
-    for i in range(0, 10):
-        results.append(main(with_bm=True))
+    # results = []
+    #
+    # for i in range(0, 10):
+    #     results.append(main(with_bm=True))
+    #
+    # print(results)
+    #
+    # with open("approx_mnist/results.txt", "w") as f:
+    #     f.write(str(results))
 
-    print(results)
-
-    with open("approx_mnist/results.txt", 'w') as f:
-        f.write(str(results))
-
-    # result_stats()
-    # plot_results()
+    # after results have been obtained
+    result_stats()

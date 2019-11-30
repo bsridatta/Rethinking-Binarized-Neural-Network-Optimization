@@ -1,4 +1,8 @@
-setuptools==41.6.0 
+setuptools==41.6.0
+scipy
+numpy
+tensorflow-gpu
+larq
 torch
 torchvision
 torchsummary
