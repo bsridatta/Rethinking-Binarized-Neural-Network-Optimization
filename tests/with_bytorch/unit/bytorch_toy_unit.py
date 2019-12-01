@@ -5,7 +5,11 @@ import torch.nn.functional as f
 import torch.optim as opt
 import torch.utils.data as dutils
 
-from binary_models import MomentumWithThresholdBinaryOptimizer, BinaryLinear, binarize
+from research_seed.bytorch.binary_neural_network import (
+    MomentumWithThresholdBinaryOptimizer,
+    BinaryLinear,
+    binarize,
+)
 
 from matplotlib import pyplot as plt
 

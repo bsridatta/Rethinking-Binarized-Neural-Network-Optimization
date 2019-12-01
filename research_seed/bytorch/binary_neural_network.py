@@ -1,10 +1,13 @@
 ###############################################################################
 #
-# Provides Pytorch modules for a binary convolution network:
+# Provides the required elements to implement a binary convolutional network in
+# PyTorch.
+#
+# This file contains the following elements are implemented:
 # * BinaryLinear
 # * BinaryConv2d
-#
-# Also includes Binary Optimizer
+# * sign function with straight-through estimator gradient
+# * Binary optimization algorithm
 #
 # Inspiration taken from:
 # https://github.com/itayhubara/BinaryNet.pytorch/blob/master/models/binarized_modules.py
@@ -58,14 +61,21 @@ class Binarize(Function):
 
         return output * grad_output
 
+
 binarize = Binarize.apply
 
 ################################################################################
 # Optimizers for binary networks
 
-
 class MomentumWithThresholdBinaryOptimizer(Optimizer):
-    def __init__(self, binary_params, bn_params, ar: float = 0.0001, threshold: float = 0, adam_lr=0.001):
+    def __init__(
+        self,
+        binary_params,
+        bn_params,
+        ar: float = 0.0001,
+        threshold: float = 0,
+        adam_lr=0.001,
+    ):
         if not 0 < ar < 1:
             raise ValueError(
                 "given adaptivity rate {} is invalid; should be in (0, 1) (excluding endpoints)".format(
@@ -81,7 +91,9 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
         self._adam = Adam(bn_params, lr=adam_lr)
 
         defaults = dict(adaptivity_rate=ar, threshold=threshold)
-        super(MomentumWithThresholdBinaryOptimizer, self).__init__(binary_params, defaults)
+        super(MomentumWithThresholdBinaryOptimizer, self).__init__(
+            binary_params, defaults
+        )
 
     def step(self, closure: Optional[Callable[[], float]] = ..., ar=None):
         self._adam.step()
@@ -114,22 +126,6 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
                 mask = mask.double() * -1
                 mask[mask == 0] = 1
 
-                if param_idx == len(params):
-                    print("p")
-                    print(p)
-                    print("grad")
-                    print(grad)
-                    print("m")
-                    print(m)
-                    print("threshold")
-                    print((m.abs() >= t))
-                    print("equal sign")
-                    print((m.sign() == p.sign()))
-
-                    print("mask")
-                    print((m.abs() >= t) * (m.sign() == p.sign()))
-                    print(mask)
-
                 flips[param_idx] = (mask == -1).sum().item()
 
                 p.data.mul_(mask)
@@ -139,9 +135,6 @@ class MomentumWithThresholdBinaryOptimizer(Optimizer):
     def zero_grad(self) -> None:
         super().zero_grad()
         self._adam.zero_grad()
-
-class LatentWeightBinaryOptimizer:
-    pass
 
 
 ################################################################################
@@ -219,6 +212,3 @@ class BinaryConv2d(nn.Conv2d):
         return f.conv2d(
             inp, weight, bias, self.stride, self.padding, self.dilation, self.groups
         )
-
-
-################################################################################

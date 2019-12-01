@@ -1,3 +1,4 @@
+matplotlib
 setuptools==41.6.0
 scipy
 numpy
