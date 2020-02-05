@@ -10,7 +10,7 @@ from torchsummary import summary
 from torchvision.datasets import MNIST
 from torchvision.transforms import transforms
 
-from binary_models import (
+from research_seed.bytorch.binary_neural_network import (
     MomentumWithThresholdBinaryOptimizer,
     BinaryLinear,
     BinaryConv2d,
@@ -200,7 +200,6 @@ def main():
             print("average loss", sum_loss / total_losses)
 
             # print_params(network)
-
 
             correct = 0
             total = 0

@@ -11,33 +11,40 @@
 </div>
  
 ## Description   
-Reproducting the results in "Latent Weights Do Not Exist: Rethinking Binarized Neural Network Optimization" for the Reproducibility challenge@NeurIPS19 in PyTorch.
 
-## How to run   (Rest to be edited)
+This repository aims to reproduce the results in "Latent Weights Do Not Exist: Rethinking Binarized Neural Network Optimization" as part of the NeurIPS 2019 reproducibility challenge. 
+We have implemented the Binary optimization algorithm in PyTorch and with it are able to train a binary neural network on CIFAR-10. 
+See the [reproducibility report](report/reproducibility_report.pdf) for details. 
+
+## How to run
+
 First, install dependencies   
+
 ```bash
 # clone project   
-git clone https://github.com/YourGithubName/Your-project-name   
+git clone https://github.com/nikvaessen/Rethinking-Binarized-Neural-Network-Optimization
 
 # install project   
-cd Your-project-name 
+cd https://github.com/nikvaessen/Rethinking-Binarized-Neural-Network-Optimization
 pip install -e .   
 pip install requirements.txt
  ```   
- Next, navigate to [Your Main Contribution (MNIST here)] and run it.   
+
+If you are interested in training a BNN on cifar-10, you can navigate to `research_seed/cifar` and run `cifar_trainer.py`.   
+
  ```bash
 # module folder
-cd research_seed/mnist/   
+cd research_seed/cifar/   
 
-# run module (example: mnist as your main contribution)   
-python mnist_trainer.py    
+# run module 
+python cifar_trainer.py    
 ```
 
 ## Main Contribution      
-List your modules here. Each module contains all code for a full system including how to run instructions.   
-- [MNIST](https://github.com/williamFalcon/pytorch-lightning-conference-seed/tree/master/research_seed/mnist)  
 
-## Baselines    
-List your baselines here.   
-- [MNIST_baseline](https://github.com/williamFalcon/pytorch-lightning-conference-seed/tree/master/research_seed/baselines/mnist_baseline)  
-
+In order to reproduce the original paper we have implemented the following:
+ 
+- [Bytorch](research_seed/bytorch) implements binary optimisation and binary layers in PyTorch
+- [cifar](research_seed/cifar) implement BinaryNet ([from this paper](https://arxiv.org/abs/1602.02830)) for CIFAR-10
+- [theoretical](research_seed/theoretical) implements experiments to disprove the approximation viewpoint as well as behaviour of learning rates under latent-weight optimisation
+- [experiments](experiments) contains convenience scripts to reproduce the experiments of section 5.1 and 5.2 of the original paper 

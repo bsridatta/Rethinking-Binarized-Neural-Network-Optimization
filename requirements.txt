@@ -1,4 +1,9 @@
-setuptools==41.6.0 
+matplotlib
+setuptools==41.6.0
+scipy
+numpy
+tensorflow-gpu
+larq
 torch
 torchvision
 torchsummary

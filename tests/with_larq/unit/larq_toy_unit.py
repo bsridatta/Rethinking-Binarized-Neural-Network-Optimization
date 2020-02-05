@@ -48,15 +48,13 @@ def main():
         [np.array([[-1.0, -1.0, -1.0], [1.0, -1.0, 1.0], [1.0, 1.0, -1.0]])]
     )
 
-    batch = np.array([[0.1, -0.3, -0.5], [-.1, .3, -0.5], [-1., -0.1, .2]])
+    batch = np.array([[0.1, -0.3, -0.5], [-0.1, 0.3, -0.5], [-1.0, -0.1, 0.2]])
     label = np.array([0, 1, 2])
 
     opt = lq.optimizers.Bop(tf.keras.optimizers.Adam(0.1), threshold=1e-6, gamma=1e-5)
     # opt = tf.keras.optimizers.Adam(0.1)
 
-    model.compile(
-        optimizer=opt, loss="categorical_hinge", metrics=["accuracy"]
-    )
+    model.compile(optimizer=opt, loss="categorical_hinge", metrics=["accuracy"])
 
     model.fit(batch, label, epochs=100, verbose=2)
 
@@ -65,6 +63,7 @@ def main():
 
     e = model.evaluate(batch)
     print(e)
+
 
 if __name__ == "__main__":
     main()

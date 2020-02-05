@@ -2,20 +2,21 @@ import larq as lq
 import tensorflow as tf
 import tensorflow.keras as tk
 
+from scipy.stats import f_oneway
+
 from typing import List
 
 from time import time
-import json
 
 
-def get_mnist_data():
+def get_cifar_data():
     (train_images, train_labels), (
         test_images,
         test_labels,
-    ) = tk.datasets.mnist.load_data()
+    ) = tk.datasets.cifar10.load_data()
 
-    train_images = train_images.reshape((60000, 28, 28, 1))
-    test_images = test_images.reshape((10000, 28, 28, 1))
+    train_images = train_images.reshape((50000, 32, 32, 3))
+    test_images = test_images.reshape((10000, 32, 32, 3))
 
     # Normalize pixel values to be between -1 and 1
     train_images, test_images = train_images / 127.5 - 1, test_images / 127.5 - 1
@@ -42,7 +43,7 @@ def build_model(
             kernel_quantizer="ste_sign",
             kernel_constraint="weight_clip",
             use_bias=False,
-            input_shape=(28, 28, 1),
+            input_shape=(32, 32, 3),
             trainable=not only_train_bm_layers,
         )
     )
@@ -74,7 +75,7 @@ def build_model(
 
 
 def train_model(model, epochs=10):
-    (train_images, train_labels), _ = get_mnist_data()
+    (train_images, train_labels), _ = get_cifar_data()
 
     tb = tk.callbacks.TensorBoard(
         log_dir="./approx_mnist/experiment__" + str(time()),
@@ -87,13 +88,13 @@ def train_model(model, epochs=10):
         train_labels,
         batch_size=64,
         epochs=epochs,
-        verbose=0,
+        verbose=1,
         callbacks=[tb],
     )
 
 
 def test_model(model):
-    _, (test_images, test_labels) = get_mnist_data()
+    _, (test_images, test_labels) = get_cifar_data()
 
     test_loss, test_acc = model.evaluate(test_images, test_labels, verbose=False)
 
@@ -169,21 +170,24 @@ def main(with_bm=True):
 
 
 def result_stats():
+    # copied from results.txt
     res = [
-        (0.9839, 0.1033, 0.9814),
-        (0.9529, 0.1032, 0.9811),
-        (0.9822, 0.1032, 0.9825),
-        (0.9443, 0.104, 0.9798),
-        (0.952, 0.1032, 0.9807),
-        (0.9766, 0.1032, 0.9821),
-        (0.9756, 0.1094, 0.9813),
-        (0.9811, 0.1032, 0.9774),
-        (0.982, 0.1032, 0.9803),
-        (0.9323, 0.1032, 0.9805),
+        (0.5922, 0.1013, 0.5976),
+        (0.5778, 0.1, 0.5897),
+        (0.5561, 0.1, 0.588),
+        (0.5657, 0.0879, 0.5985),
+        (0.5557, 0.1168, 0.5905),
+        (0.5838, 0.1, 0.5868),
+        (0.5765, 0.0917, 0.6013),
+        (0.5862, 0.1, 0.5939),
+        (0.5863, 0.1, 0.6009),
+        (0.5504, 0.0802, 0.5948),
     ]
+
     bin = []
     real = []
     real_retrained = []
+
     for r in res:
         bin += [r[0]]
         real += [r[1]]
@@ -195,38 +199,34 @@ def result_stats():
     real = np.array(real)
     real_retrained = np.array(real_retrained)
 
-    print("1")
+    f, pvalue = f_oneway(bin, real, real_retrained)
+
+    print("binary")
     print(np.mean(bin))
-    print(np.var(bin))
+    print(np.std(bin))
 
-    print("2")
+    print("latent")
     print(np.mean(real))
-    print(np.var(real))
+    print(np.std(real))
 
-    print("3")
+    print("latent retrained")
     print(np.mean(real_retrained))
-    print(np.var(real_retrained))
+    print(np.std(real_retrained))
 
-
-def plot_results():
-    fn1 = "run-experiment__1572644426.4495745_train-tag-epoch_accuracy.json"
-    fn2 = "run-experiment__1572644519.5294988_train-tag-epoch_accuracy.json"
-
-    dp1 = json.load(open(fn1))
-    dp2 = json.load(open(fn2))
-
-    print(dp1)
+    print("significant")
+    print("f", f, "p", pvalue)
 
 
 if __name__ == "__main__":
-    results = []
-    for i in range(0, 10):
-        results.append(main(with_bm=True))
+    # results = []
+    #
+    # for i in range(0, 10):
+    #     results.append(main(with_bm=True))
+    #
+    # print(results)
+    #
+    # with open("approx_cifar/results.txt", "w") as f:
+    #     f.write(str(results))
 
-    print(results)
-
-    with open("approx_mnist/results.txt", 'w') as f:
-        f.write(str(results))
-
-    # result_stats()
-    # plot_results()
+    # after results have been obtained
+    result_stats()
